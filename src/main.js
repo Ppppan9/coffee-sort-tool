@@ -2,6 +2,7 @@ import { levelFromLayout, REF_LAYOUT, generateLevel, initState, canSend, applySe
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID } from './settings.js';
 import { DW, DH, mk, boardGeo, drawBackground, drawBoard, tileSprite, slotPositions, cupSprite, boxSprite, counterSprite, niceSprite, sparkSprite, starSprite, boxBodySprite, boxFlapSprite, boxDims, beltPath, beltScale, drawBelt, defaultHand, tileColor } from './render.js';
 import { Sfx } from './audio.js';
+import { DEFAULT_HAND } from './default_hand.js';
 import { create3D, IS3D } from './three/scene3d.js';
 import { createAERecorder } from './ae/recorder.js';
 import { export3D } from './export3d/export3d.js';
@@ -213,7 +214,7 @@ function scene(t) {
   vis.nices.forEach((n, k) => { const p = (t - n.t0) / Math.max(1, S.niceDur), s = backOut(p * 2.6) * (p > 0.75 ? 1 + (p - 0.75) * 0.4 : 1), op = p > 0.75 ? 1 - (p - 0.75) * 4 : 1; const nx = S.counterX + 8, ny = S.counterY - 10; add('nice_' + Math.round(n.t0), 'nice', nx, ny, { sx: s, z: 80, op: Math.max(0, op) }); add('spark_' + Math.round(n.t0), 'spark', nx + 70, ny - 20, { sx: 0.6 + p * 1.6, z: 81, op: Math.max(0, 1 - p * 1.3), rot: p * 1.2 }); });
   if (S.discShow) add('disclaimer', 'disclaimer', 0, 0, { z: 90 });
   const ea = endAlpha(t); if (ea > 0) add('end_card', 'end_card', 0, 0, { z: 95, op: ea });
-  const hs = handState(); if (hs) add('hand', 'hand', hs.x, hs.y, { sx: hs.s, z: 100 });
+  const hs = handState(); if (hs) add('hand', 'hand', hs.x, hs.y, { sx: hs.s * (S.handFlip ? -1 : 1), sy: hs.s, rot: S.handRotation * Math.PI / 180, z: 100 });
   out.sort((a, b) => a.z - b.z);
   return out;
 }
@@ -443,7 +444,7 @@ function applyChange(k) {
   if (k === 'handImage' || k === 'handAnchorX' || k === 'handAnchorY') loadHand();
   if (NEWGAME_KEYS.test(k)) newGame(); else if (L && !/^(sfx|auto|move|delay|think|jitter|hand|press|tap|rec|tail|ae|export3d|end|slide|cup(Interval|Fly)|box(Grow|Close|Fly)|niceDur|shake|mismatch)/.test(k) || /^(endTitle)$/.test(k)) rebuild();
 }
-function loadHand() { const done2 = im => { hand.img = im; if (L) rebuild(); }; if (!S.handImage) { done2(defaultHand()); return; } const im = new Image(); im.onload = () => done2(im); im.src = S.handImage; }
+function loadHand() { const done2 = im => { hand.img = im; if (L) rebuild(); }; const im = new Image(); im.onload = () => done2(im); im.onerror = () => done2(defaultHand()); /* 默认 = 麻将工具同款手指 PNG */ im.src = S.handImage || DEFAULT_HAND; }
 function buildPanel() {
   const body = document.getElementById('panelBody'); body.innerHTML = '';
   GROUPS.forEach(([title, items], gi) => {

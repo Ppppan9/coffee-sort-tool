@@ -45,12 +45,7 @@ function tileGeo(R, S, w) {
   const body = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 3, curveSegments: 16 }); body.rotateX(-Math.PI / 2);
   const prof = []; for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI / 2; prof.push(new THREE.Vector2(Math.max(0.001, br * Math.sin(a)), th + 0.03 - Math.min(br * 0.8, th * 0.8) * Math.cos(a))); }
   const bowl = new THREE.LatheGeometry(prof, 24);
-  // 托盘体 + 凹槽合并为一个几何体（每个托盘 1 次绘制）
-  const parts = [body.toNonIndexed ? (body.index ? body.toNonIndexed() : body) : body]; body.clearGroups();
-  for (const [x, y] of slots) { const b2 = bowl.clone().toNonIndexed(); b2.translate(x, 0, -y); parts.push(b2); }
-  parts.forEach(g2 => { g2.clearGroups(); for (const n of Object.keys(g2.attributes)) if (!['position', 'normal', 'uv'].includes(n)) g2.deleteAttribute(n); });
-  const merged = mergeGeometries(parts, false) || body;
-  return (R.geos[k] = { body: merged, bowl, slots: [], th: th + 0.03 });
+  return (R.geos[k] = { body, bowl, slots, th: th + 0.03 });
 }
 function cupGeo(R) {
   if (R.geos.cup) return R.geos.cup;

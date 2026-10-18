@@ -1,5 +1,6 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
-export const SETTINGS_VERSION = 3;
+import { DEFAULT_HAND } from './default_hand.js';
+export const SETTINGS_VERSION = 5;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -143,9 +144,11 @@ export const GROUPS = [
     ['thinkMax', '思考停顿最长(ms)', 'range', 900, 0, 4000, 50],
     ['jitter', '落点随机抖动(px)', 'range', 6, 0, 40, 1],
     ['handSize', '手指大小(画面宽比例)', 'range', 0.42, 0.1, 0.9, 0.01],
-    ['handAnchorX', '指尖锚点 X(0~1)', 'range', 0.05, 0, 1, 0.005],
-    ['handAnchorY', '指尖锚点 Y(0~1)', 'range', 0.05, 0, 1, 0.005],
-    ['handImage', '上传手指图片(透明PNG，不上传则用内置手+触控笔)', 'file', ''],
+    ['handAnchorX', '指尖锚点 X(0~1)', 'range', 0.22039473684210525, 0, 1, 0.005],
+    ['handAnchorY', '指尖锚点 Y(0~1)', 'range', 0.03667763157894737, 0, 1, 0.005],
+    ['handRotation', '手指旋转(度)', 'range', 6, -60, 60, 1],
+    ['handFlip', '手指水平翻转', 'bool', false],
+    ['handImage', '上传手指图片(透明PNG；默认=麻将工具同款手指)', 'file', DEFAULT_HAND],
     ['pressEnabled', '点击按下效果', 'bool', true],
     ['pressDepth', '按压幅度（按下时手指缩小比例）', 'range', 0.07, 0, 0.3, 0.01],
     ['tapRipple', '点击处显示波纹圈（参考视频没有）', 'bool', false],
@@ -197,7 +200,7 @@ export function migrate(obj) {
     mv('handImg', 'handImage'); mv('sfxVol', 'sfxVolume'); mv('sfx', 'sfxMute', x => !x); mv('recTail', 'tailSec', x => Math.round(x / 100) / 10); mv('endText', 'endTitle');
     v = 1;
   }
-  const OLD = { 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
+  const OLD = { 5: { handSize: 0.34, handAnchorX: 0.05, handAnchorY: 0.05, handImage: '' }, 4: { handSize: 0.42 }, 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
   for (const nv of Object.keys(OLD).map(Number).sort()) if (v < nv) { for (const k in OLD[nv]) if (s[k] === OLD[nv][k]) delete s[k]; v = nv; }
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];

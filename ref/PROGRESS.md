@@ -26,3 +26,6 @@
 
 ## v1.2 进行中（2026-10-18 23:10 起）
 - 目标：(1) 3D 相机 + 棋盘/传送带/计数器颜色逐帧对齐参考并输出分区色差/位置差报告；(2) 纸箱折叠逐帧对比（screenshots/box_fold_ref_vs_tool.jpg）并修正时序/缓动/缩放/翻盖顺序；(3) 3D 导出复用页面 three.js 模型；(4) AE 导出 3D 渲染图层（默认在 3D 渲染开启时）。
+- (1) ✅ 6a50ada：相机按参考棋盘格拟合（tools/fit_camera.mjs：FOV 30 / 俯角 51，格子世界尺寸离散度 0.0006）；传送带改为沿路径扫掠截面（外壁+圆角挡边+带面），带面/托盘顶面/外框顶面/杯底都按自身高度反投影到 2D 位置；3D 颜色按分区中位数校准（test/ref-compare.mjs + tools/ref_diff.py → screenshots/ref_vs_tool.jpg、ref_diff_report.json）；设置 v6 migrate
+- (2) ✅ 61a62b7：纸箱逐帧对比（test/box-fold.mjs → screenshots/box_fold_ref_vs_tool.jpg）：托盘+杯子先升起悬空（150px，ease-out），纸箱在其下长出、翻盖摊平+放大，前后盖先合、左右盖后合（中缝竖直），向右飞出（经计数器后方）；Nice 位置/大小/白光按参考；__game.renderAt 虚拟时钟
+- (3)(4) 进行中：3D 导出复用 scene3d 模型；AE 3D 渲染图层

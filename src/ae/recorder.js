@@ -37,7 +37,7 @@ export function createAERecorder(api) {
     for (const it of E.items) {
       const key = it.id + '|' + it.asset; let tr = R.tracks.get(key);
       if (!tr) { tr = { id: it.id, asset: it.asset, z: it.z, s: [], order: R.tracks.size }; R.tracks.set(key, tr); }
-      tr.s.push([t, r3(it.x), r3(it.y), r3(it.sx), r3(it.sy), r3(it.rot), r3(it.op), f, r3(it.lift || 0), r3(it.z)]);
+      tr.s.push(it.w ? [t, r3(it.x), r3(it.y), r3(it.sx), r3(it.sy), r3(it.rot), r3(it.op), f, r3(it.lift || 0), r3(it.z), r3(it.w[0]), r3(it.w[1]), r3(it.w[2]), r3(it.wk ?? 1)] : [t, r3(it.x), r3(it.y), r3(it.sx), r3(it.sy), r3(it.rot), r3(it.op), f, r3(it.lift || 0), r3(it.z)]); // [10..13] = 世界锚点 + 缩放（v1.2.1，3D 导出 / AE 3D 外观用）
       if (it.meta) (tr.m || (tr.m = new Map())).set(f, { ...it.meta }); // 纸箱：尺寸 / 翻盖角度 / 阶段（3D 导出与 AE 3D 外观用）
     }
     if (R.snapEvery && f % R.snapEvery === R.snapEvery - 1 && R.snaps.length < R.maxSnaps) R.snaps.push({ t, url: E.canvas.toDataURL('image/png') });

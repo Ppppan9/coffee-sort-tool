@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { DW, DH, LANES } from '../render.js';
+import { createWorld, setBelt } from '../world.js';
 
 const COLS = S => ({ brown: S.colBrown, cream: S.colCream, green: S.colGreen });
 const CUPC = S => ({ brown: [S.cupBrown, S.cupBrownLiq], cream: [S.cupCream, S.cupCreamLiq], green: [S.cupGreen, S.cupGreenLiq] });
@@ -48,13 +49,14 @@ function roundedRect(w, d, r) { const s = new THREE.Shape(), x = -w / 2, y = -d 
 // 硅胶托盘（单位：1 格 = 1），顶面挖 2w×2 个圆孔 + 半球凹槽
 function tileGeo(R, S, w) {
   const k = `tile_${w}_${S.tileRadius}_${S.bowlSize}_${S.tile3dThick}`; if (R.geos[k]) return R.geos[k];
-  const W = w - 0.035, D = 0.965, r = Math.min(0.3, S.tileRadius / S.cellW), th = S.tile3dThick, br = 0.25 * S.bowlSize;
+  // v1.2.1：倒角包含在外形内（外形 = w − 缝隙，与相邻托盘 / 外框不重叠），底面在 y=0（不陷进底板）
+  const bv = 0.03, gp = S.tileGap / S.cellW, W = w - gp - 2 * bv, D = 1 - gp - 2 * bv, r = Math.min(0.3, S.tileRadius / S.cellW), th = S.tile3dThick, br = 0.25 * S.bowlSize;
   const sh = roundedRect(W, D, r), slots = [];
   for (let q = 0; q < 2; q++) for (let p = 0; p < w * 2; p++) { const x = (p + 0.5) * 0.5 - w / 2, y = (q + 0.5) * 0.5 - 0.5; slots.push([x, y]); const h = new THREE.Path(); h.absarc(x, y, br, 0, Math.PI * 2, true); sh.holes.push(h); }
-  const body = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 3, curveSegments: 16 }); body.rotateX(-Math.PI / 2);
-  const prof = []; for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI / 2; prof.push(new THREE.Vector2(Math.max(0.001, br * Math.sin(a)), th + 0.03 - Math.min(br * 0.8, th * 0.8) * Math.cos(a))); }
+  const body = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelSegments: 3, curveSegments: 16 }); body.rotateX(-Math.PI / 2); body.translate(0, bv, 0);
+  const prof = []; for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI / 2; prof.push(new THREE.Vector2(Math.max(0.001, br * Math.sin(a)), th + 2 * bv - Math.min(br * 0.8, th * 0.8) * Math.cos(a))); }
   const bowl = new THREE.LatheGeometry(prof, 24);
-  return (R.geos[k] = { body, bowl, slots, th: th + 0.03 });
+  return (R.geos[k] = { body, bowl, slots, th: th + 2 * bv });
 }
 function cupGeo(R) {
   if (R.geos.cup) return R.geos.cup;
@@ -81,8 +83,8 @@ function beltProfile(S) {
 export function beltMesh(R, S, belt) {
   const raw = belt.pts.filter(p => p[1] > -260), pts = [];
   for (const p of raw) if (!pts.length || Math.hypot(p[0] - pts[pts.length - 1][0], p[1] - pts[pts.length - 1][1]) > 0.75) pts.push(p);
-  const frames = pts.map(([x, y], i) => {
-    const sc = R.wpp(x, y), hT = S.belt3dHeight * sc, [x2, y2] = pts[Math.min(pts.length - 1, i + 1)], [x0, y0] = pts[Math.max(0, i - 1)];
+  const frames = pts.map(([x, y], i) => { // v1.2.1：世界等宽等高（带面高度 W.beltH，宽度 × W.k0），中心线 = 杯子行进的同一条世界折线
+    const sc = R.W ? R.W.k0 : R.wpp(x, y), hT = S.belt3dHeight * sc, [x2, y2] = pts[Math.min(pts.length - 1, i + 1)], [x0, y0] = pts[Math.max(0, i - 1)];
     const c = R.unproj(x, y, hT).setY(0), dir = R.unproj(x2, y2, hT).sub(R.unproj(x0, y0, hT)).setY(0).normalize();
     return { c, n: new THREE.Vector3(-dir.z, 0, dir.x), sc };
   });
@@ -107,7 +109,7 @@ export function beltMesh(R, S, belt) {
 function setup(R, S, L, G, belt) {
   setCamera(R, S);
   R.statics.clear(); if (R.cupInst) { for (const c in R.cupInst) R.cupInst[c].forEach(m => R.scene.remove(m)); R.cupInst = null; } R.pool.forEach(o => R.dyn.remove(o.obj)); R.pool.clear(); R.mats = {}; R.geos = {};
-  R.S = S; R.G = G; R.L = L;
+  R.S = S; R.G = G; R.L = L; R.W = createWorld(S, L); setBelt(R.W, belt.pts);
   const sunDir = new THREE.Vector3().setFromSphericalCoords(1, (90 - S.light3dElev) * Math.PI / 180, S.light3dAzim * Math.PI / 180);
   R.sunDir = sunDir;
   // v1.2 传送带：沿路径扫掠截面（外侧壁 → 圆角挡边 → 带面 → 圆角挡边 → 外侧壁），带面（杯子站立面）落在 2D 路径上（与参考第 0 帧车道一致）
@@ -116,10 +118,10 @@ function setup(R, S, L, G, belt) {
   // 棋盘：底板（每个掩码格一块）+ 外框
   const floorM = new THREE.MeshStandardMaterial({ color: S.floorColor, roughness: 0.7 }), frameM = new THREE.MeshStandardMaterial({ color: S.frameColor, roughness: 0.55 }); floorM.name = 'pbr_board_floor'; frameM.name = 'pbr_board_frame';
   const quad = (pA, pB, pC, pD, h, m) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([pA.x, h, pA.z, pB.x, h, pB.z, pC.x, h, pC.z, pD.x, h, pD.z], 3)); g.setIndex([0, 2, 1, 1, 2, 3]); g.computeVertexNormals(); const me = new THREE.Mesh(g, m); me.receiveShadow = true; return me; };
-  const W = (u, v) => { const [x, y] = G.P(u, v); return R.unproj(x, y); };
+  const W = (u, v) => { const [x, z] = R.W.B(u, v); return new THREE.Vector3(x, 0, z); }; // 世界等距网格（托盘按同一网格摆放 → 严格对齐格心）
   for (let r = 0; r < L.rows; r++) for (let c = 0; c < L.cols; c++) if (L.mask[r * L.cols + c]) { const q = quad(W(c, r), W(c + 1, r), W(c, r + 1), W(c + 1, r + 1), 0.5, floorM); q.name = `board_floor_${r}_${c}`; R.statics.add(q); }
   // 外框：沿棋盘外边缘一圈的厚边（简单矩形框）
-  const fw = S.frameW / S.cellW, fr = (u0, v0, u1, v1) => { const sc = R.wpp(...G.P((u0 + u1) / 2, (v0 + v1) / 2)), h = S.frame3dHeight * sc, WH = (u, v) => R.unproj(...G.P(u, v), h), a = WH(u0, v0), b = WH(u1, v0), c2 = WH(u0, v1), d = WH(u1, v1); const g = new THREE.BufferGeometry(); const P = [a, b, c2, d]; const pos = []; P.forEach(p => pos.push(p.x, h, p.z)); P.forEach(p => pos.push(p.x, 0, p.z)); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex([0, 2, 1, 1, 2, 3, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 5, 3, 7, 0, 1, 4, 4, 1, 5]); g.computeVertexNormals(); const m = new THREE.Mesh(g, frameM); m.name = 'board_frame_' + R.statics.children.length; m.castShadow = true; m.receiveShadow = true; R.statics.add(m); };
+  const fw = S.frameW / S.cellW, fr = (u0, v0, u1, v1) => { const h = S.frame3dHeight * R.W.k0, WH = (u, v) => W(u, v), a = WH(u0, v0), b = WH(u1, v0), c2 = WH(u0, v1), d = WH(u1, v1); const g = new THREE.BufferGeometry(); const P = [a, b, c2, d]; const pos = []; P.forEach(p => pos.push(p.x, h, p.z)); P.forEach(p => pos.push(p.x, 0, p.z)); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex([0, 2, 1, 1, 2, 3, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 5, 3, 7, 0, 1, 4, 4, 1, 5]); g.computeVertexNormals(); const m = new THREE.Mesh(g, frameM); m.name = 'board_frame_' + R.statics.children.length; m.castShadow = true; m.receiveShadow = true; R.statics.add(m); };
   fr(-fw, -fw, 0, L.rows + fw); fr(L.cols, -fw, L.cols + fw, L.rows + fw); fr(0, L.rows, L.cols, L.rows + fw);
   fr(0, -fw, L.cols / 2 - 1, 0); fr(L.cols / 2 + 1, -fw, L.cols, 0);
   // 灯光：阴影范围覆盖整个画面
@@ -187,16 +189,21 @@ function apply(R, items, S) {
     const a = it.asset; if (!IS3D(a) || a === 'belt' || a === 'board' || it.op <= 0.01) continue;
     if (a.startsWith('tile_')) {
       const [, color, w2, fl] = a.split('_'); if (fl) { const o = R.pool.get(it.id.replace(/_flash$/, '')); if (o) o.flash = it.op; continue; }
-      const obj = getObj(R, it.id, () => makeTile(R, S, color, +w2)), sc = R.wpp(it.x, it.y + (it.lift || 0)) * S.cellW;
-      const k2 = sc * it.sx, { p, h } = R.place(it, tileGeo(R, S, +w2).th * k2); obj.position.set(p.x, h, p.z); /* 顶面中心 = 2D 锚点 */ obj.scale.set(k2, k2, k2 * (it.sy / it.sx) / (R.G.sy(0) / R.G.sx(0)) * 0 + k2);
+      const obj = getObj(R, it.id, () => makeTile(R, S, color, +w2));
+      if (it.w) { const k = it.wk ?? 1; obj.position.set(it.w[0], it.w[1], it.w[2]); obj.scale.set(R.W.C * k, R.W.C * k, R.W.CZ * k); } // v1.2.1：世界锚点 = 托盘底面中心
+      else { const sc = R.wpp(it.x, it.y + (it.lift || 0)) * S.cellW, k2 = sc * it.sx, { p, h } = R.place(it, tileGeo(R, S, +w2).th * k2); obj.position.set(p.x, h, p.z); obj.scale.set(k2, k2, k2); }
       obj.userData.m.emissive.setRGB(0, 0, 0); R.pool.get(it.id).flash = 0;
     } else if (a.startsWith('cup_')) { // 杯子用 InstancedMesh（每色一批），数百个杯子也只有几次绘制调用
       const color = a.slice(4), wp = R.wpp(it.x, it.y + (it.lift || 0)), sc = S.cupSize * wp * it.sx * S.cup3dScale, onBelt = it.z < 3, hb = onBelt ? R.beltTopH * wp : (it.z >= 49 ? S.tile3dThick * S.cellW * wp * 0.6 : 0), { p, h } = R.place(it, hb);
-      if (R.exportMode) { const o = getObj(R, it.id, () => makeCup(R, S, color)); o.position.set(p.x, hb + h, p.z); o.scale.set(sc, sc * (it.sy / it.sx), sc); o.quaternion.identity(); }
-      else { M4.compose(V3.set(p.x, hb + h, p.z), Q0, SC.set(sc, sc * (it.sy / it.sx), sc)); (cupsBy[color] || (cupsBy[color] = [])).push(M4.clone()); }
+      const P3 = it.w ? V3.set(it.w[0], it.w[1], it.w[2]) : V3.set(p.x, hb + h, p.z), k3 = it.w ? R.W.cupD : sc; // v1.2.1：世界锚点 = 杯底中心，世界尺寸恒定
+      if (R.exportMode) { const o = getObj(R, it.id, () => makeCup(R, S, color)); o.position.copy(P3); o.scale.set(k3, k3, k3); o.quaternion.identity(); }
+      else { M4.compose(P3, Q0, SC.set(k3, k3, k3)); (cupsBy[color] || (cupsBy[color] = [])).push(M4.clone()); }
     } else if (a.startsWith('boxbody_') && it.meta) {
       const m = it.meta, obj = getObj(R, it.id, () => makeBox(R, S)), thT = (S.tile3dThick + 0.03) * S.cellW * R.wpp(it.x, it.y + (it.lift || 0)) * (m.W / boxW(S, m.w)), { p, h, wp } = R.place(it, thT);
-      const W = m.W * wp, D = m.D * wp, H = Math.max(1e-4, m.H * wp); obj.position.set(p.x, Math.max(0, h + thT * 0.9 - H), p.z); /* 参考：箱口 ≈ 升起的托盘顶面，箱体在其下方向下长出（悬空） */ layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1);
+      if (m.wx != null) { // v1.2.1：世界纸箱——底面 = 升起托盘底面下方，箱壁在托盘 / 杯子外侧（留间隙），箱口高于杯口，向上长出；翻盖铰链在箱口 → 任何角度都不碰杯子
+        const Wn = R.W, bs = m.bsc || 1, W = Math.max(0.98 * m.w * Wn.C * bs, 2 * Wn.tileHalfX(m.w) + 3), D = Math.max(0.98 * Wn.CZ * bs, 2 * Wn.tileHalfZ() + 3), H = Math.max(1e-4, Wn.boxInnerH * m.grow);
+        obj.position.set(m.wx, m.wy, m.wz); layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1);
+      } else { const W = m.W * wp, D = m.D * wp, H = Math.max(1e-4, m.H * wp); obj.position.set(p.x, Math.max(0, h + thT * 0.9 - H), p.z); layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1); }
       obj.traverse(o => { if (o.material) { o.material.transparent = it.op < 1; o.material.opacity = it.op; } });
     }
   }

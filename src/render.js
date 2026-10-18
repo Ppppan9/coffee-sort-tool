@@ -53,13 +53,14 @@ export function drawBoard(c, S, L, k) {
 // ---------- 托盘精灵（俯视 + 厚度边），w×h 格；sprite 坐标单位 = 设计 px（顶行格尺寸）----------
 export function tileSprite(S, color, w, h, k, opts = {}) {
   const CW = S.cellW, CH = S.cellH, gap = S.tileGap, th = S.tileThick, pad = 6;
-  const W = w * CW - gap, H = h * CH - gap, c = mk((W + pad * 2) * k, (H + th + pad * 2) * k), g = c.getContext('2d');
+  const W = w * CW - gap, H = h * CH - gap, thE = Math.max(th, opts.thPx || 0), c = mk((W + pad * 2) * k, (H + thE + 2 + pad * 2) * k), g = c.getContext('2d');
   g.setTransform(k, 0, 0, k, pad * k, pad * k);
   const base = tileColor(S, color);
   // 投影
-  g.fillStyle = 'rgba(20,30,60,0.28)'; rr(g, 1, th + 1, W, H, S.tileRadius); g.fill();
+  const te = opts.thPx ?? th * 0.6; // 侧边投影厚度（v1.2.1：= 世界托盘厚度在出口处的投影，2D 与 3D 同高）
+  g.fillStyle = 'rgba(20,30,60,0.28)'; rr(g, 1, te + 1.5, W, H, S.tileRadius); g.fill();
   // 厚度边
-  g.fillStyle = shade(base, -0.28); rr(g, 0, th * 0.6, W, H, S.tileRadius); g.fill();
+  g.fillStyle = shade(base, -0.28); rr(g, 0, te, W, H, S.tileRadius); g.fill();
   // 顶面
   const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, shade(base, 0.12)); gr.addColorStop(1, shade(base, -0.06));
   g.fillStyle = opts.flash ? '#ff4a3a' : gr; rr(g, 0, 0, W, H, S.tileRadius); g.fill();
@@ -79,7 +80,7 @@ export function tileSprite(S, color, w, h, k, opts = {}) {
     g.strokeStyle = shade(base, -0.3 * d); g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, br, ry, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
     g.strokeStyle = shade(base, 0.4 * d); g.lineWidth = 1.3; g.beginPath(); g.ellipse(x, y + 0.5, br, ry, 0, Math.PI * 0.1, Math.PI * 0.9); g.stroke();
   }
-  return { c, w: W + pad * 2, h: H + th + pad * 2, ax: (W / 2 + pad), ay: (H / 2 + pad) }; // 锚点 = 顶面中心
+  return { c, w: W + pad * 2, h: H + thE + 2 + pad * 2, ax: (W / 2 + pad), ay: (H / 2 + pad) }; // 锚点 = 顶面中心
 }
 // 凹槽中心（相对托盘顶面中心，设计 px，顶行尺度）
 export function slotPositions(S, w, h) {
@@ -165,7 +166,8 @@ export function beltPath(S, exitXY) {
 export const beltScale = y => { const t = Math.max(-0.3, Math.min(1.15, (y + 20) / 560)); return 0.72 + 0.28 * (t < 0 ? t : Math.pow(t, 0.92)); };
 export function drawBelt(c, S, path, k) {
   const g = c.getContext('2d'); g.setTransform(k, 0, 0, k, 0, 0); g.lineCap = 'round'; g.lineJoin = 'round';
-  const strokeAll = (wk, col, dy) => { for (let i = 1; i < path.pts.length; i++) { const a = path.pts[i - 1], b = path.pts[i]; g.strokeStyle = col; g.lineWidth = S.beltW * beltScale(b[1]) * wk; g.beginPath(); g.moveTo(a[0], a[1] + dy * beltScale(b[1])); g.lineTo(b[0], b[1] + dy * beltScale(b[1])); g.stroke(); } };
+  const sc = path.scaleAt || ((x, y) => beltScale(y)); // v1.2.1：世界等宽带的投影缩放（与 3D 同）
+  const strokeAll = (wk, col, dy) => { for (let i = 1; i < path.pts.length; i++) { const a = path.pts[i - 1], b = path.pts[i], k2 = sc(b[0], b[1]); g.strokeStyle = col; g.lineWidth = S.beltW * k2 * wk; g.beginPath(); g.moveTo(a[0], a[1] + dy * k2); g.lineTo(b[0], b[1] + dy * k2); g.stroke(); } };
   strokeAll(1.18, 'rgba(60,40,10,0.28)', 16); strokeAll(1.08, S.beltSide, 12); strokeAll(1.08, shade(S.beltSide, 0.12), 6); strokeAll(1.04, shade(S.beltTop, 0.12), 0); strokeAll(0.86, S.beltSide, 1); strokeAll(0.8, S.beltTop, 1.5); strokeAll(0.4, shade(S.beltTop, -0.05), 1.5);
 }
 // ---------- 内置手 + 白色触控笔（笔尖在左上 = 锚点 0.05/0.05）----------

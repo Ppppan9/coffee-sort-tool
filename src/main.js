@@ -1,0 +1,394 @@
+import { levelFromLayout, REF_LAYOUT, generateLevel, initState, canSend, applySend, done, stuck, solve, capacity, frontColor, maskFromAlpha, connectMask, planQueue } from './level.js';
+import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID } from './settings.js';
+import { DW, DH, mk, boardGeo, drawBackground, drawBoard, tileSprite, slotPositions, cupSprite, boxSprite, counterSprite, niceSprite, sparkSprite, beltPath, beltScale, drawBelt, defaultHand, tileColor } from './render.js';
+import { Sfx } from './audio.js';
+import { createAERecorder } from './ae/recorder.js';
+import { export3D } from './export3d/export3d.js';
+
+let S = loadSettings();
+const cv = document.getElementById('stage'); let ctx = cv.getContext('2d');
+const sfx = new Sfx();
+const now = () => performance.now();
+const clamp01 = t => t < 0 ? 0 : t > 1 ? 1 : t;
+const ease = t => 1 - Math.pow(1 - clamp01(t), 3), easeIO = t => { t = clamp01(t); return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+const backOut = t => { t = clamp01(t); const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+const status = t => { document.getElementById('status').textContent = t; };
+let L, st, G, belt, A = {}, vis, jobs, finishedAt = 0, failedAt = 0, autoRunning = false, autoToken = 0;
+const hand = { x: 820, y: 1450, press: 0, pressT0: null, img: null, visible: false, follow: null };
+const ripples = [];
+const view = () => { const k = cv.width / DW; return { k, oy: (cv.height - DH * k) / 2 }; };
+
+// ---------- 关卡 ----------
+const shapeCache = { src: null, img: null };
+function colorsFor() { const c = ['brown', 'cream', 'green']; return c.slice(0, S.colorCount); }
+function imageLevel() {
+  if (!S.shapeImg) return null;
+  if (shapeCache.src !== S.shapeImg) { shapeCache.src = S.shapeImg; shapeCache.img = null; const im = new Image(); im.onload = () => { shapeCache.img = im; newGame(); }; im.src = S.shapeImg; return null; }
+  if (!shapeCache.img) return null;
+  const im = shapeCache.img, sc = Math.min(1, 512 / Math.max(im.width, im.height)), w = Math.round(im.width * sc), h = Math.round(im.height * sc);
+  const c = mk(w, h), g = c.getContext('2d'); g.drawImage(im, 0, 0, w, h); const d = g.getImageData(0, 0, w, h).data, al = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) al[i] = d[i * 4 + 3];
+  const mask = connectMask(maskFromAlpha(al, w, h, S.cols, S.rows, S.shapeThreshold, S.shapeCover), S.cols, S.rows);
+  const Lx = generateLevel({ cols: S.cols, rows: S.rows, seed: S.shapeSeed, mask, colors: colorsFor(), wideColor: 'green', wideChance: S.wideChance, checker: S.checker, runBias: S.runBias });
+  if (Lx && S.shapeTint === 'image') { // 按图片颜色就近匹配三色
+    const pal = colorsFor().map(n => [n, hexRGB(tileColor(S, n))]);
+    Lx.tiles.forEach(t => { const x0 = Math.floor((t.c + t.w / 2) / S.cols * w), y0 = Math.floor((t.r + 0.5) / S.rows * h), i = (Math.min(h - 1, y0) * w + Math.min(w - 1, x0)) * 4; let best = t.color, bd = 1e9; for (const [n, p] of pal) { if ((t.w === 2) !== (n === 'green') && pal.length > 2) continue; const dd = (d[i] - p[0]) ** 2 + (d[i + 1] - p[1]) ** 2 + (d[i + 2] - p[2]) ** 2; if (dd < bd) { bd = dd; best = n; } } t.color = best; });
+    if (!planQueue(Lx, S.shapeSeed, S.runBias)) return generateLevel({ cols: S.cols, rows: S.rows, seed: S.shapeSeed, mask, colors: colorsFor(), wideColor: 'green', wideChance: S.wideChance, checker: S.checker });
+  }
+  return Lx;
+}
+const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+function newGame() {
+  autoToken++; autoRunning = false; updAutoBtn();
+  let Lnew = null;
+  if (S.level === 'image') Lnew = imageLevel(); else if (S.level === 'random') Lnew = generateLevel({ cols: S.cols, rows: S.rows, seed: S.seed, colors: colorsFor(), wideColor: 'green', wideChance: S.wideChance, emptyCells: S.emptyCells, checker: S.checker, runBias: S.runBias });
+  if (!Lnew && S.level === 'image' && S.shapeImg) { if (L) return; }
+  if (!Lnew) Lnew = levelFromLayout(REF_LAYOUT, S.seed, S.runBias);
+  startLevel(Lnew);
+}
+function startLevel(Lnew) {
+  L = Lnew; st = initState(L); finishedAt = 0; failedAt = 0; window.__finished = false; jobs = [];
+  vis = { tiles: L.tiles.map(t => ({ u: t.c + t.w / 2, v: t.r + 0.5, gone: false, press: 0, shake: null, flash: 0, hidden: false })), head: 0, headTarget: 0, landed: 0, cupFly: [], inTile: new Map(), boxes: [], nices: [] };
+  rebuild();
+  if (aeActive()) { aeRec.start(); updateAEButtons(); }
+  status(`托盘 ${L.tiles.length} 个，杯子 ${L.queue.length} 个${L.attempts ? '，生成尝试 ' + L.attempts + ' 次' : ''}`);
+}
+function rebuild() {
+  cv.width = S.canvasW; cv.height = S.canvasH;
+  const k = view().k * Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  G = boardGeo(S, L);
+  const exitXY = G.P(L.cols / 2, -0.35);
+  belt = beltPath(S, exitXY);
+  // 按屏幕透视缩放的弧长参数 σ（dσ = ds / scale）→ 杯子等间距
+  const sig = [0]; for (let i = 1; i < belt.pts.length; i++) { const a = belt.pts[i - 1], b = belt.pts[i]; sig.push(sig[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]) / beltScale((a[1] + b[1]) / 2)); }
+  belt.atSig = s => { if (s < 0) return null; let i = 1; while (i < sig.length && sig[i] < s) i++; if (i >= sig.length) return null; const u = (s - sig[i - 1]) / (sig[i] - sig[i - 1]), a = belt.pts[i - 1], b = belt.pts[i]; return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; };
+  belt.sigTotal = sig[sig.length - 1];
+  A = {};
+  const full = (id, fn) => { const c = mk(DW * k, DH * k); fn(c); A[id] = { c, w: DW, h: DH, ax: 0, ay: 0 }; };
+  full('background', c => drawBackground(c, S, k));
+  full('belt', c => drawBelt(c, S, belt, k));
+  full('board', c => drawBoard(c, S, L, k));
+  for (const col of ['brown', 'cream', 'green']) for (const w of [1, 2]) { A[`tile_${col}_${w}`] = tileSprite(S, col, w, 1, k * 1.25); A[`tile_${col}_${w}_flash`] = tileSprite(S, col, w, 1, k * 1.25, { flash: true }); A[`cup_${col}`] = cupSprite(S, col, k * 1.4); }
+  for (const w of [1, 2]) { A[`box_open_${w}`] = boxSprite(S, w, k * 1.25, false); A[`box_closed_${w}`] = boxSprite(S, w, k * 1.25, true); }
+  A.nice = niceSprite(S, k * 1.25); A.spark = sparkSprite(k);
+  A.counterCache = new Map();
+  { const c = mk(DW * k, DH * k); withCtx(c.getContext('2d'), () => { ctx.setTransform(k, 0, 0, k, 0, 0); drawTexts(); }); A.disclaimer = { c, w: DW, h: DH, ax: 0, ay: 0 }; }
+  { const c = mk(DW * k, DH * k); withCtx(c.getContext('2d'), () => { ctx.setTransform(k, 0, 0, k, 0, 0); drawEnd(1); }); A.end_card = { c, w: DW, h: DH, ax: 0, ay: 0 }; }
+  const hi = hand.img; if (hi) A.hand = { c: hi, w: hi.width, h: hi.height, ax: S.handAnchorX * hi.width, ay: S.handAnchorY * hi.height };
+}
+function counterAsset(n) { const id = 'counter_' + n; if (!A[id]) A[id] = counterSprite(S, n, view().k * 1.25); return id; }
+function withCtx(g, fn) { const save = ctx; ctx = g; try { fn(); } finally { ctx = save; } }
+
+// ---------- 发送托盘 ----------
+const tileScreen = (u, v) => G.P(u, v);
+function tapTile(i) {
+  const r = canSend(L, st, i), t = st.tiles[i], tv = vis.tiles[i];
+  tv.press = now(); sfx.play('pop', S);
+  if (!r.ok && !(S.mismatchRule === 'allow' && r.reason === 'color')) {
+    if (r.reason === 'busy') return false;
+    tv.shake = now(); tv.flash = now(); sfx.play('error', S); return false;
+  }
+  const path = r.path || require_path(i); if (!path) { tv.shake = now(); tv.flash = now(); sfx.play('error', S); return false; }
+  // 逻辑立即生效（求解器 / 自动通关看到的是逻辑状态）；颜色不符（allow 模式）时杯子仍按队列颜色落入
+  applySend(L, st, i); st.docked = i;
+  const pts = path.map(([c, r2]) => [c + t.w / 2, r2 + 0.5]); pts.push([L.cols / 2, L.dockRow + 0.5]);
+  const lens = [0]; for (let k = 1; k < pts.length; k++) lens.push(lens[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  const dur = Math.max(120, lens[lens.length - 1] / S.slideSpeed * 1000);
+  jobs.push({ i, ph: 'slide', t0: now(), pts, lens, dur, n: capacity(t), got: 0, nextCup: 0 });
+  if (dur > 150) sfx.play('whoosh', S, { dur: dur / 1000 });
+  return true;
+}
+function require_path(i) { const t = st.tiles[i]; const sv = st.qi; const fake = { ...st, queue: st.queue.slice() }; fake.queue[fake.qi] = t.color; const r = canSend(L, fake, i); st.qi = sv; return r.ok ? r.path : null; }
+function step(t) {
+  for (const j of jobs) {
+    const tv = vis.tiles[j.i], tile = st.tiles[j.i];
+    if (j.ph === 'slide') {
+      const p = clamp01((t - j.t0) / j.dur), s = easeIO(p) * j.lens[j.lens.length - 1];
+      let k = 1; while (k < j.lens.length - 1 && j.lens[k] < s) k++;
+      const a = j.pts[k - 1], b = j.pts[k], u = j.lens[k] > j.lens[k - 1] ? clamp01((s - j.lens[k - 1]) / (j.lens[k] - j.lens[k - 1])) : 1;
+      tv.u = a[0] + (b[0] - a[0]) * u; tv.v = a[1] + (b[1] - a[1]) * u; tv.moving = true;
+      if (p >= 1) { j.ph = 'fill'; j.t1 = t; j.nextCup = t; tv.moving = false; }
+    } else if (j.ph === 'fill') {
+      while (j.got < j.n && t >= j.nextCup) { // 下一杯离开传送带
+        const qi = vis.headTarget; vis.headTarget++; j.got++; j.nextCup += S.cupInterval;
+        const slots = slotPositions(S, tile.w, 1), sp = slots[j.got - 1];
+        vis.cupFly.push({ q: qi, t0: j.nextCup - S.cupInterval, job: j, slot: sp });
+      }
+      if (j.got >= j.n && vis.cupFly.every(c => c.job !== j) ) { j.ph = 'grow'; j.t1 = t; }
+    } else if (j.ph === 'grow') {
+      if (t - j.t1 >= S.boxGrow) { j.ph = 'close'; j.t1 = t; sfx.play('box', S); }
+    } else if (j.ph === 'close') {
+      if (t - j.t1 >= S.boxClose) { j.ph = 'fly'; j.t1 = t; st.docked = -1; sfx.play('whoosh', S, { dur: S.boxFlyDur / 1000 }); }
+    } else if (j.ph === 'fly') {
+      if (t - j.t1 >= S.boxFlyDur) { j.ph = 'done'; vis.nices.push({ t0: t }); sfx.play('chime', S); }
+    }
+  }
+  jobs = jobs.filter(j => j.ph !== 'done');
+  // 落杯
+  vis.cupFly = vis.cupFly.filter(c => { if (t - c.t0 >= S.cupFly) { vis.inTile.set(c.q, c); vis.landed++; sfx.play('cup', S); return false; } return true; });
+  // 传送带推进（平滑）
+  vis.head += (vis.headTarget - vis.head) * Math.min(1, 0.012 * (t - (step.lt || t)) * (S.cupFly / 150 > 0 ? 150 / S.cupFly : 1) * 1.6); if (Math.abs(vis.headTarget - vis.head) < 0.002) vis.head = vis.headTarget; step.lt = t;
+  vis.nices = vis.nices.filter(n => t - n.t0 < Math.max(1, S.niceDur));
+  if (!finishedAt && done(L, st) && !jobs.length && !vis.cupFly.length) { finishedAt = t; onFinish(); }
+  if (!finishedAt && !failedAt && !jobs.length && stuck(L, st) && S.mismatchRule !== 'allow') { failedAt = t; status('没有可送出的托盘（失败）——点“↻ 重新开始”'); window.__failed = true; }
+}
+
+// ---------- 场景（每帧精灵列表；画布绘制 / AE / 3D 同源）----------
+// item: {id, asset, x, y, sx, sy, rot, op, z}
+function scene(t) {
+  const out = [], add = (id, asset, x, y, o = {}) => out.push({ id, asset, x, y, sx: o.sx ?? 1, sy: o.sy ?? o.sx ?? 1, rot: o.rot || 0, op: o.op ?? 1, z: o.z ?? 0 });
+  add('background', 'background', 0, 0, { z: 0 }); add('belt', 'belt', 0, 0, { z: 1 });
+  // 传送带上的杯子
+  const gap = S.cupGap / (0.74 + 0.26) * 1.0;
+  for (let q = Math.floor(vis.head); q < L.queue.length; q++) {
+    if (q < vis.headTarget) continue; // 已离开传送带
+    const p = belt.atSig((q - vis.head) * gap); if (!p) break;
+    if (p[1] < -60) continue;
+    const s = beltScale(p[1]); add('cup_' + q, 'cup_' + L.queue[q], p[0], p[1] + 8 * s, { sx: s, z: 2 + (p[1] + 100) / 2000 });
+  }
+  add('board', 'board', 0, 0, { z: 3 });
+  // 托盘
+  const jobOf = new Map(jobs.map(j => [j.i, j]));
+  st.tiles.forEach((tile, i) => {
+    const tv = vis.tiles[i], j = jobOf.get(i);
+    if (st.removed.has(i) && !j) return;
+    if (j && (j.ph === 'grow' || j.ph === 'close' || j.ph === 'fly')) return;
+    let [x, y] = tileScreen(tv.u, tv.v); let sx = G.sx(tv.v), sy = G.sy(tv.v);
+    if (tv.shake != null) { const p = (t - tv.shake) / S.shakeDur; if (p < 1) x += Math.sin(p * Math.PI * 6) * S.shakeAmp * (1 - p); else tv.shake = null; }
+    if (tv.press) { const p = (t - tv.press) / 180; if (p < 1) { const k = 1 - S.pressScale * Math.sin(Math.PI * p); sx *= k; sy *= k; } else tv.press = 0; }
+    const z = 4 + tv.v / 100 + (j ? 1 : 0);
+    const id = 'tile_' + String(i + 1).padStart(2, '0');
+    add(id, `tile_${tile.color}_${tile.w}`, x, y, { sx, sy, z });
+    if (tv.flash) { const p = (t - tv.flash) / S.shakeDur; if (p < 1) add(id + '_flash', `tile_${tile.color}_${tile.w}_flash`, x, y, { sx, sy, z: z + 0.001, op: 0.75 * Math.sin(Math.PI * Math.min(1, p * 1.4)) }); else tv.flash = 0; }
+  });
+  // 飞行中的杯子 & 杯中杯子
+  const dockXY = tileScreen(L.cols / 2, L.dockRow + 0.5), dsx = G.sx(L.dockRow + 0.5), dsy = G.sy(L.dockRow + 0.5);
+  const exitXY = belt.pts[0];
+  for (const c of vis.cupFly) {
+    const p = clamp01((t - c.t0) / S.cupFly); if (p <= 0) { continue; }
+    const tx = dockXY[0] + c.slot[0] * dsx, ty = dockXY[1] + c.slot[1] * dsy + S.cupSize * 0.38;
+    const e = easeIO(p), x = exitXY[0] + (tx - exitXY[0]) * e, y = exitXY[1] + 8 + (ty - exitXY[1] - 8) * e - Math.sin(Math.PI * p) * 18;
+    add('cup_' + c.q, 'cup_' + L.queue[c.q], x, y, { sx: beltScale(y) * (1 - 0.15 * e), z: 50 });
+  }
+  for (const j of jobs) {
+    if (!(j.ph === 'fill' || j.ph === 'grow' || j.ph === 'close' || j.ph === 'slide')) continue;
+    const tile = st.tiles[j.i], bw = tile.w;
+    let bo = 1, by = 0;
+    if (j.ph === 'grow') { const p = ease((t - j.t1) / S.boxGrow); add('box_' + j.i, `box_open_${bw}`, dockXY[0], dockXY[1] + S.cellH * 0.5 * dsy, { sx: dsx * (0.3 + 0.7 * p), sy: dsy * p, z: 49 }); }
+    if (j.ph === 'close') { const p = (t - j.t1) / S.boxClose; if (p < 0.5) { add('box_' + j.i, `box_open_${bw}`, dockXY[0], dockXY[1] + S.cellH * 0.5 * dsy, { sx: dsx, sy: dsy * (1 - 0.25 * p), z: 49 }); } else bo = 0; }
+    if (bo) for (const [q, c] of vis.inTile) if (c.job === j) add('cup_' + q, 'cup_' + L.queue[q], dockXY[0] + c.slot[0] * dsx, dockXY[1] + c.slot[1] * dsy + S.cupSize * 0.38 + by, { sx: beltScale(dockXY[1]) * 0.85, z: 50 + c.slot[1] / 1000 });
+  }
+  for (const j of jobs) {
+    const tile = st.tiles[j.i], bw = tile.w;
+    if (j.ph === 'close' && (t - j.t1) / S.boxClose >= 0.5) { const p = ((t - j.t1) / S.boxClose - 0.5) * 2; add('box_' + j.i + '_closed', `box_closed_${bw}`, dockXY[0], dockXY[1] + S.cellH * 0.5 * dsy - 6 * Math.sin(Math.PI * p), { sx: dsx * (1 + 0.06 * Math.sin(Math.PI * p)), sy: dsy, z: 49 }); }
+    if (j.ph === 'fly') {
+      const p = (t - j.t1) / S.boxFlyDur, e = easeIO(p), x0 = dockXY[0], y0 = dockXY[1] + S.cellH * 0.5 * dsy, x1 = S.counterX + 113, y1 = S.counterY + 40;
+      const x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e - Math.sin(Math.PI * e) * 80;
+      add('box_' + j.i + '_closed', `box_closed_${bw}`, x, y, { sx: dsx * (1 - 0.45 * e), sy: dsy * (1 - 0.45 * e), z: 60, op: p > 0.8 ? (1 - p) * 5 : 1 });
+    }
+  }
+  if (S.counterShow) { const n = Math.max(0, S.counterStart - vis.landed); add('counter', counterAsset(n), S.counterX, S.counterY, { z: 70 }); }
+  vis.nices.forEach((n, k) => { const p = (t - n.t0) / Math.max(1, S.niceDur), s = backOut(p * 2.6) * (p > 0.75 ? 1 + (p - 0.75) * 0.4 : 1), op = p > 0.75 ? 1 - (p - 0.75) * 4 : 1; const nx = S.counterX + 8, ny = S.counterY - 10; add('nice_' + Math.round(n.t0), 'nice', nx, ny, { sx: s, z: 80, op: Math.max(0, op) }); add('spark_' + Math.round(n.t0), 'spark', nx + 70, ny - 20, { sx: 0.6 + p * 1.6, z: 81, op: Math.max(0, 1 - p * 1.3), rot: p * 1.2 }); });
+  if (S.discShow) add('disclaimer', 'disclaimer', 0, 0, { z: 90 });
+  const ea = endAlpha(t); if (ea > 0) add('end_card', 'end_card', 0, 0, { z: 95, op: ea });
+  const hs = handState(); if (hs) add('hand', 'hand', hs.x, hs.y, { sx: hs.s, z: 100 });
+  out.sort((a, b) => a.z - b.z);
+  return out;
+}
+function drawScene(items, g, k) {
+  for (const it of items) {
+    const a = A[it.asset]; if (!a || it.op <= 0) continue;
+    g.setTransform(k, 0, 0, k, 0, view().oy); g.translate(it.x, it.y); if (it.rot) g.rotate(it.rot); g.scale(it.sx, it.sy);
+    g.globalAlpha = Math.min(1, it.op); g.drawImage(a.c, -a.ax, -a.ay, a.w, a.h);
+  }
+  g.globalAlpha = 1;
+}
+function draw(t) {
+  const v = view(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const items = scene(t); draw.items = items; drawScene(items, ctx, v.k);
+  ctx.setTransform(v.k, 0, 0, v.k, 0, v.oy);
+  ripples.forEach(r => { const p = (t - r.t0) / 350; if (p > 1) return; ctx.beginPath(); ctx.arc(r.x, r.y, 10 + 30 * p, 0, 7); ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - p)})`; ctx.lineWidth = 3; ctx.stroke(); });
+  while (ripples.length && t - ripples[0].t0 > 400) ripples.shift();
+}
+function drawTexts() {
+  if (!S.discShow) return;
+  ctx.save(); const fs = S.discSize, y = DH - S.discY;
+  ctx.fillStyle = `rgba(0,0,0,${S.discBar})`; ctx.fillRect(0, y - fs * 1.5, DW, fs * 1.5 + S.discY);
+  ctx.globalAlpha = S.textOpacity; ctx.fillStyle = '#fff'; ctx.font = `bold ${fs}px "Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(S.discText, DW / 2, y - fs * 0.2);
+  ctx.restore();
+}
+function endAlpha(t) { return finishedAt && S.endCard && t - finishedAt > S.endDelay ? Math.min(1, (t - finishedAt - S.endDelay) / 400) : 0; }
+function drawEnd(p, noDim) {
+  ctx.save(); ctx.globalAlpha = p; ctx.fillStyle = 'rgba(0,0,0,.55)'; if (!noDim) ctx.fillRect(0, 0, DW, DH);
+  ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.roundRect(160, 600, 400, 100, 50); ctx.fill();
+  ctx.fillStyle = '#4a2a00'; ctx.font = 'bold 34px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(S.endTitle, 360, 650);
+  ctx.restore();
+}
+function handScaleOf() { return hand.img ? S.handSize * DW / hand.img.width : 1; }
+const handHiddenByEnd = () => !S.endCardHand && endAlpha(now()) > 0;
+function handState() { if (!S.handShow || !hand.img || !hand.visible || handHiddenByEnd()) return null; return { x: hand.x, y: hand.y, s: handScaleOf() * (1 - S.pressDepth * hand.press) }; }
+
+// ---------- 交互 ----------
+function screenToBoard(x, y) { const dy = y - S.boardTop, v = dy / (S.cellH + S.persp * dy), u = (x - (DW / 2 + S.boardOffX)) * (1 - S.persp * v) / S.cellW + L.cols / 2; return [u, v]; }
+function hitTile(x, y) { const [u, v] = screenToBoard(x, y); return st.tiles.findIndex((t, i) => !st.removed.has(i) && u >= t.c && u < t.c + t.w && v >= t.r && v < t.r + t.h); }
+function tapAt(x, y) { sfx.resume(); if (S.tapRipple) ripples.push({ x, y, t0: now() }); if (finishedAt) return false; const i = hitTile(x, y); if (i < 0) return false; return tapTile(i); }
+function evtPos(e) { const r = cv.getBoundingClientRect(); const px = (e.clientX - r.left) / r.width * cv.width, py = (e.clientY - r.top) / r.height * cv.height; const v = view(); return { x: px / v.k, y: (py - v.oy) / v.k }; }
+cv.addEventListener('pointerdown', e => { if (autoRunning) return; const p = evtPos(e); hand.x = p.x; hand.y = p.y; hand.visible = true; if (S.pressEnabled) hand.pressT0 = now(); tapAt(p.x, p.y); });
+cv.addEventListener('pointermove', e => { if (autoRunning) return; const p = evtPos(e); hand.x = p.x; hand.y = p.y; hand.visible = true; });
+cv.addEventListener('pointerleave', () => { if (!autoRunning) hand.visible = false; });
+function updPress(t) { if (!S.pressEnabled || hand.pressT0 == null) { hand.press = 0; return; } const p = (t - hand.pressT0) / 180; hand.press = p < 0 || p > 1 ? (hand.follow ? 1 : 0) : (hand.follow && p > 0.5 ? 1 : Math.sin(Math.PI * p)); }
+
+// ---------- 自动通关 ----------
+const wait = (ms, tok) => new Promise((res, rej) => setTimeout(() => tok === autoToken ? res() : rej('stop'), ms / S.autoSpeed));
+const rr = (a, b) => a + Math.random() * Math.max(0, b - a);
+const frame = () => new Promise(r => requestAnimationFrame(r));
+async function moveHand(tx, ty, tok) {
+  const x0 = hand.x, y0 = hand.y, dur = rr(S.moveMin, S.moveMax) / S.autoSpeed, t0 = now();
+  const cx = (x0 + tx) / 2 + (Math.random() - 0.3) * 60, cy = (y0 + ty) / 2 + 40 + Math.random() * 40;
+  while (true) { if (tok !== autoToken) throw 'stop'; const p = Math.min(1, (now() - t0) / dur), e = easeIO(p); hand.x = (1 - e) * (1 - e) * x0 + 2 * (1 - e) * e * cx + e * e * tx; hand.y = (1 - e) * (1 - e) * y0 + 2 * (1 - e) * e * cy + e * e * ty; if (p >= 1) return; await frame(); }
+}
+async function autoSolve() {
+  if (autoRunning) { autoToken++; autoRunning = false; hand.visible = false; hand.follow = null; updAutoBtn(); return; }
+  if (finishedAt || failedAt) newGame();
+  let plan = solve(L, st); if (!plan) { status('当前局面无解，请重新开始'); return; }
+  const tok = ++autoToken; autoRunning = true; updAutoBtn(); sfx.resume();
+  hand.x = 820; hand.y = 1450; hand.visible = true;
+  if (S.autoRec && !rec) startRec();
+  try {
+    await wait(S.autoStartDelay, tok);
+    while (!done(L, st)) {
+      while (st.docked >= 0) { if (tok !== autoToken) throw 'stop'; await frame(); }
+      if (!plan.length || !canSend(L, st, plan[0]).ok) { plan = solve(L, st) || []; if (!plan.length) { status('当前局面无解'); break; } }
+      const i = plan.shift(), tv = vis.tiles[i], [x, y] = tileScreen(tv.u, tv.v), j = S.jitter;
+      await moveHand(x + (Math.random() - 0.5) * j, y + (Math.random() - 0.5) * j, tok);
+      if (S.pressEnabled) hand.pressT0 = now();
+      await wait(60, tok);
+      const dx = hand.x - x, dy = hand.y - y;
+      if (!tapTile(i)) { await wait(300, tok); continue; }
+      if (S.handFollow) { // 按住托盘跟随滑动（参考：触控笔拖动）
+        hand.follow = i; const job = jobs.find(q => q.i === i);
+        while (job && job.ph === 'slide') { if (tok !== autoToken) throw 'stop'; const [hx, hy] = tileScreen(tv.u, tv.v); hand.x = hx + dx; hand.y = hy + dy; await frame(); }
+        hand.follow = null; hand.pressT0 = null;
+      }
+      await wait(rr(S.delayMin, S.delayMax) + (Math.random() < S.thinkChance ? Math.random() * S.thinkMax : 0), tok);
+    }
+    while (jobs.length) { if (tok !== autoToken) throw 'stop'; await frame(); }
+  } catch (e) { if (e !== 'stop') console.error(e); }
+  if (tok === autoToken) { autoRunning = false; updAutoBtn(); }
+}
+function onFinish() { status('通关！'); window.__finished = true; if (rec && S.autoStop) setTimeout(stopRec, S.tailSec * 1000 + (S.endCard ? S.endDelay : 0)); }
+function updAutoBtn() { const b = document.getElementById('btnAuto'); if (b) { b.textContent = autoRunning ? '■ 停止' : '▶ 自动通关'; b.classList.toggle('on', autoRunning); } }
+
+// ---------- 录制 ----------
+let rec = null, recChunks = [], recT0 = 0;
+function pickMime() {
+  const mp4 = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4'], webm = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  const list = S.recFormat === 'webm' ? webm : mp4.concat(webm);
+  return list.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+}
+function startRec() {
+  if (!window.MediaRecorder) { status('浏览器不支持录制'); return; }
+  sfx.ensure();
+  const vs = cv.captureStream(S.recFps), tracks = [...vs.getVideoTracks()];
+  if (sfx.recDest) tracks.push(...sfx.recDest.stream.getAudioTracks());
+  const mime = pickMime();
+  rec = new MediaRecorder(new MediaStream(tracks), { mimeType: mime || undefined, videoBitsPerSecond: S.recBitrate * 1e6 });
+  recChunks = []; rec.ondataavailable = e => e.data.size && recChunks.push(e.data);
+  rec.onstop = () => {
+    const type = rec.mimeType || mime || 'video/webm', ext = type.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(recChunks, { type }), url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `coffee_${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`; a.textContent = `⬇ ${a.download} (${(blob.size / 1e6).toFixed(1)}MB)`;
+    document.getElementById('recList').prepend(a); window.__lastRec = { size: blob.size, type }; rec = null; updRecBtn();
+    if (aeByRec && aeActive()) aeStopAndExport().catch(e => console.error(e));
+    aeByRec = false;
+  };
+  rec.start(250); recT0 = now(); updRecBtn(); aeByRec = false; if (S.aeWithRec && !aeActive()) { recStart(); aeByRec = true; }
+}
+function stopRec() { if (rec && rec.state !== 'inactive') rec.stop(); }
+function updRecBtn() { const b = document.getElementById('btnRec'); b.textContent = rec ? '■ 停止录制' : '⏺ 开始录制'; b.classList.toggle('on', !!rec); }
+
+// ---------- AE / 3D 导出 ----------
+const aeRec = createAERecorder({ sfx, env: () => ({ L, st, S, A, items: draw.items || [], canvas: cv, handImg: hand.img }) });
+let recClosed = false, aeLastRec = null, aeByRec = false;
+function recStart() { aeRec.start(); recClosed = false; updateAEButtons(); toast('开始记录 AE 时间轴'); }
+function aeActive() { return !!aeRec.rec && !recClosed; }
+function aeStop() { const r = aeRec.rec; recClosed = true; updateAEButtons(); if (r && r.frames > 1) aeLastRec = r; return r && r.frames > 1 ? r : null; }
+async function aeStopAndExport() { const r = aeStop(); if (!r) { toast('没有记录到内容'); return null; } return doExportAE(true, r); }
+const curRec = () => aeActive() ? aeRec.rec : aeLastRec && aeLastRec.L === L ? aeLastRec : null;
+function updateAEButtons() { const b = document.getElementById('btn_aeToggle'); if (!b) return; b.textContent = aeActive() ? `■ 停止并导出（${((now() - (aeRec.rec.t0 || now())) / 1000).toFixed(1)}s）` : '● 开始记录'; b.classList.toggle('on', aeActive()); }
+const PANEL_ACTIONS = { aeToggle: () => aeActive() ? aeStopAndExport() : recStart(), aeExport: () => doExportAE(), export3d: () => doExport3D() };
+function recTailDone(t) { return finishedAt && t - finishedAt > (S.endCard ? S.endDelay + 400 : 0) + Math.max(800, S.tailSec * 1000); }
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.textContent = `⬇ ${name} (${(blob.size / 1e6).toFixed(1)}MB)`; document.getElementById('recList').prepend(a); a.click(); }
+async function doExportAE(save = true, r0 = curRec()) {
+  if (!r0) { toast('请先用“开始记录”记录一段（自动通关或手动游玩）'); return null; }
+  status('正在生成 AE 工程…'); const r = await aeRec.exportZip(r0); window.__aeLast = r;
+  if (save) download(r.blob, r.name); status(`AE 工程：${r.stats.layers} 图层，${r.stats.keys} 关键帧`); return r;
+}
+async function doExport3D(save = true, r0 = curRec()) {
+  if (!r0) { toast('请先用“开始记录”记录一段（自动通关或手动游玩）'); return null; }
+  status('正在生成 3D 动画…'); const ae = await aeRec.exportZip(r0, { aeFps: String(+S.export3dFps || 30), aeSize: 'canvas', aeSampling: 'bake', aeNames: 'en', aeAudio: 'both' });
+  const r = await export3D({ S: { ...r0.S, export3dFps: S.export3dFps, export3dHand: S.export3dHand, export3dTiles: S.export3dTiles, endCardHand: S.endCardHand }, ae, rec: r0, A });
+  window.__e3dLast = r; if (save) download(r.blob, r.name); status(`3D 动画：${r.stats.nodes} 节点，${r.duration.toFixed(2)}s`); return r;
+}
+
+// ---------- 主循环 ----------
+function loop(t) {
+  step(t); updPress(t); draw(t);
+  if (aeActive()) { if (recTailDone(t)) aeStop(); else aeRec.sample(t); if (t - (loop.aeBtnT || 0) > 250) { loop.aeBtnT = t; updateAEButtons(); } }
+  document.getElementById('recInfo').textContent = rec ? `录制中 ${((t - recT0) / 1000).toFixed(1)}s` : '';
+  requestAnimationFrame(loop);
+}
+
+// ---------- 设置面板 ----------
+const NEWGAME_KEYS = /^(level|seed|cols|rows|emptyCells|colorCount|checker|wideChance|runBias|shape)/;
+function applyChange(k) {
+  if (k === 'shapeImg' && S.shapeImg) S.level = 'image';
+  saveSettings(S);
+  if (k === 'handImage' || k === 'handAnchorX' || k === 'handAnchorY') loadHand();
+  if (NEWGAME_KEYS.test(k)) newGame(); else if (L && !/^(sfx|auto|move|delay|think|jitter|hand|press|tap|rec|tail|ae|export3d|end|slide|cup(Interval|Fly)|box(Grow|Close|Fly)|niceDur|shake|mismatch)/.test(k) || /^(endTitle)$/.test(k)) rebuild();
+}
+function loadHand() { const done2 = im => { hand.img = im; if (L) rebuild(); }; if (!S.handImage) { done2(defaultHand()); return; } const im = new Image(); im.onload = () => done2(im); im.src = S.handImage; }
+function buildPanel() {
+  const body = document.getElementById('panelBody'); body.innerHTML = '';
+  GROUPS.forEach(([title, items], gi) => {
+    const det = document.createElement('details'); if (gi < 1) det.open = true; det.innerHTML = `<summary>${title}</summary>`;
+    items.forEach(([k, label, type, def, a, b, step2]) => {
+      const row = document.createElement('div'); row.className = 'row'; row.innerHTML = `<label title="${k}">${label}</label>`;
+      if (type === 'range') {
+        const r = document.createElement('input'); r.type = 'range'; r.min = a; r.max = b; r.step = step2; r.value = S[k];
+        const n = document.createElement('input'); n.type = 'number'; n.className = 'val'; n.step = step2; n.value = S[k];
+        r.oninput = () => { S[k] = +r.value; n.value = r.value; applyChange(k); }; n.onchange = () => { S[k] = +n.value; r.value = n.value; applyChange(k); };
+        row.append(r, n);
+      } else if (type === 'color') { const c = document.createElement('input'); c.type = 'color'; c.value = S[k]; c.oninput = () => { S[k] = c.value; applyChange(k); }; row.append(c); }
+      else if (type === 'bool') { row.classList.add('t-switch'); const l = document.createElement('label'); l.className = 'switch'; l.innerHTML = `<input type="checkbox" class="switch-input" id="chk_${k}" ${S[k] ? 'checked' : ''}><span class="slider"></span>`; l.querySelector('input').onchange = e => { S[k] = e.target.checked; applyChange(k); }; row.append(l); }
+      else if (type === 'select') { const s = document.createElement('select'); a.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; s.append(o); }); s.value = S[k]; s.onchange = () => { S[k] = s.value; applyChange(k); }; row.append(s); }
+      else if (type === 'text') { const t = document.createElement('input'); t.type = 'text'; t.value = S[k]; t.oninput = () => { S[k] = t.value; applyChange(k); }; row.append(t); }
+      else if (type === 'button') { const bt = document.createElement('button'); bt.id = 'btn' + k; bt.textContent = a; bt.onclick = () => Promise.resolve(PANEL_ACTIONS[def] && PANEL_ACTIONS[def]()).catch(e => { status('导出失败：' + e.message); console.error(e); }); row.append(bt); }
+      else if (type === 'file') {
+        const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/png,image/webp,image/*'; f.id = 'file_' + k;
+        f.onchange = () => { const file = f.files[0]; if (!file) return; const fr = new FileReader(); fr.onload = () => { S[k] = fr.result; applyChange(k); if (k === 'shapeImg') buildPanel(); }; fr.readAsDataURL(file); };
+        const x = document.createElement('button'); x.textContent = '清除'; x.onclick = () => { S[k] = ''; f.value = ''; applyChange(k); };
+        row.append(f, x);
+      }
+      det.append(row);
+    });
+    if (title.startsWith('手指')) det.insertAdjacentHTML('beforeend', '<div class="tip">默认内置“手 + 白色触控笔”（参考视频风格）。上传透明背景 PNG 可替换，用锚点 X/Y 标定笔尖在图片中的相对位置。</div>');
+    if (title.startsWith('导入')) det.insertAdjacentHTML('beforeend', '<div class="tip">任意带透明通道的 PNG/WebP：按“列数×行数”网格量化（格内 alpha&gt;阈值的面积 &gt;50% 记为格子），自动在顶部中央开出口并保证与出口连通，生成器校验关卡可解。</div>');
+    body.append(det);
+  });
+}
+let toastT = 0;
+function toast(t, dur = 1600) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); if (dur > 0) toastT = setTimeout(() => el.classList.remove('show'), dur); }
+document.getElementById('btnAuto').onclick = autoSolve;
+document.getElementById('btnNew').onclick = newGame;
+document.getElementById('btnSeed').onclick = () => { S.seed = 1 + Math.floor(Math.random() * 9999); if (S.level === 'reference') S.level = 'random'; if (S.level === 'image') S.shapeSeed = S.seed; saveSettings(S); buildPanel(); newGame(); };
+document.getElementById('btnShape').onclick = () => document.getElementById('file_shapeImg').click();
+document.getElementById('btnRec').onclick = () => rec ? stopRec() : startRec();
+document.getElementById('btnShot').onclick = () => { const a = document.createElement('a'); a.href = cv.toDataURL('image/png'); a.download = 'coffee_shot.png'; a.click(); };
+document.getElementById('btnExport').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([exportJSON(S)], { type: 'application/json' })); a.download = 'coffee-sort-tool-settings.json'; a.click(); };
+document.getElementById('btnImport').onclick = () => document.getElementById('importFile').click();
+document.getElementById('importFile').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { const j = JSON.parse(t); S = migrate(j); saveSettings(S); buildPanel(); loadHand(); newGame(); toast('已导入设置'); }).catch(() => toast('导入失败')); };
+document.getElementById('btnReset').onclick = () => { if (!confirm('恢复全部默认设置？')) return; S = { ...DEFS }; saveSettings(S); buildPanel(); loadHand(); newGame(); };
+window.__game = { autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
+buildPanel(); loadHand(); newGame();
+requestAnimationFrame(loop);

@@ -23,7 +23,7 @@ for (const sc of SC) {
     G.set('render3d', false); for (const k in D) G.set(k, D[k]); G.newGame(); G.set('render3d', true); G.S.render3d = false; // 3D 场景已按本关卡建好；逐帧只 apply 不渲染，画面用 2D（快）
     const ck = __clipInit(); let t = 2e6; G.renderAt(t);
     const raf = () => new Promise(r => requestAnimationFrame(r)); let n = 0;
-    const step = () => { t += 1000 / 30; G.renderAt(t); ck.check(G.items && G.items.length ? G.items : G.scene(), { t: Math.round(t - 2e6), dragging: G.drag ? 'tile_' + String(G.drag.i + 1).padStart(2, '0') : null }); n++; };
+    const step = () => { t += 1000 / 30; G.renderAt(t); ck.check(G.items && G.items.length ? G.items : G.scene(), { t: Math.round(t - 2e6), dragging: G.drag ? 'tile_' + String(G.drag.i + 1).padStart(2, '0') : null, shaking: G.vis ? G.vis.tiles.map((v, i) => v.shake != null ? 'tile_' + String(i + 1).padStart(2, '0') : null).filter(Boolean) : [] }); n++; };
     if (sc.shake) { // 依次点每块（被挡的会抖动 + 红光），每次推进 0.5 s
       const N = G.st.tiles.length; for (let i = 0; i < N; i++) { const ok = G.canSend(i).ok; if (ok) continue; G.tapTile(i); for (let k = 0; k < 15; k++) step(); }
     } else {

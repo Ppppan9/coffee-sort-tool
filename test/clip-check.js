@@ -82,7 +82,7 @@ window.__clipInit = function () {
       { const q = beltQ(a.x, a.z); if (q && a.y0 < q.f.rail) { const r = Math.hypot(a.hx, a.hz); const pen = Math.min(q.f.hw + Math.min(a.hx, a.hz) - q.d, -q.e + Math.min(a.hx, a.hz), q.f.rail - a.y0); if (pen > 0) P('tray-belt', pen, { t: ctx.t, a: a.id }); } }
       // 静止时对准格心（或出口停靠位）
       const pv = st.prev.get(a.id), still = pv && Math.hypot(pv[0] - a.x, pv[1] - a.z) < 1e-4 && Math.abs(pv[2] - a.y0) < 1e-4; st.prev.set(a.id, [a.x, a.z, a.y0]);
-      if (still && a.y0 < 5 && !(ctx.dragging === a.id)) { let e = 1e9; for (const [gx, gz] of goodCentres) e = Math.min(e, Math.hypot(a.px - gx, a.pz - gz)); A2('tray-cell centre', e, 0.5, { t: ctx.t, a: a.id }); A2('tray-floor height', Math.abs(a.y0 - floorY), 0.5, { t: ctx.t, a: a.id }); }
+      if (still && a.y0 < 5 && !(ctx.dragging === a.id) && !(ctx.shaking || []).includes(a.id)) { let e = 1e9; for (const [gx, gz] of goodCentres) e = Math.min(e, Math.hypot(a.px - gx, a.pz - gz)); A2('tray-cell centre', e, 0.5, { t: ctx.t, a: a.id }); A2('tray-floor height', Math.abs(a.y0 - floorY), 0.5, { t: ctx.t, a: a.id }); }
     }
     // ---- 纸箱：箱壁 / 箱底 / 翻盖 vs 箱内托盘与杯子 ----
     for (const [id, o] of R.pool) { if (!o.used || !/^box_\d+_body$/.test(id)) continue; const box = o.obj, p = box.userData, W = p.front.scale.x, D = p.left.scale.x, H = p.front.scale.y, bx = box.position.x, by = box.position.y, bz = box.position.z;
@@ -101,7 +101,7 @@ window.__clipInit = function () {
     // ---- 2D 绘制顺序（画家算法）：屏幕上重叠的杯子，离相机近的必须后画 ----
     const ord = items.map((it, k) => [it, k]).filter(([it]) => /^cup_\d+$/.test(it.id) && it.op > 0.01);
     for (let i = 0; i < ord.length; i++) for (let j = i + 1; j < ord.length; j++) { const [a, ka] = ord[i], [b, kb] = ord[j]; const wa = S.cupSize * a.sx, wb = S.cupSize * b.sx; if (Math.abs(a.x - b.x) > (wa + wb) / 2 || Math.abs(a.y - b.y) > S.cupSize * 1.5) continue; // 屏幕重叠
-      if (Math.abs(a.y - b.y) < 0.5) continue; const nearer = a.y > b.y ? ka : kb, farther = a.y > b.y ? kb : ka; // 杯底屏幕 y 越大越近
+      const da = a.w ? a.w[2] : a.y, db = b.w ? b.w[2] : b.y; if (Math.abs(da - db) < 0.5) continue; const nearer = da > db ? ka : kb, farther = da > db ? kb : ka; // 世界 z 越大越近（旧版无世界锚点时用杯底屏幕 y）
       if (nearer < farther) A2('2D draw order (cup-cup)', 1, 0.5, { t: ctx.t, a: a.id, b: b.id }); else A2('2D draw order (cup-cup)', 0, 0.5, {}); }
   };
   st.report = () => ({ frames: st.frames, TOL_world: +st.TOL.toFixed(3), belt: st.belt, board: st.board, pairs: Object.fromEntries(Object.entries(st.pairs).map(([k, v]) => [k, { maxPen: +v.max.toFixed(2), violations: v.n, worstAt: v.at }])), align: Object.fromEntries(Object.entries(st.align).map(([k, v]) => [k, { max: +v.max.toFixed(3), tol: v.tol, violations: v.n, worstAt: v.at }])), samples: st.samples });

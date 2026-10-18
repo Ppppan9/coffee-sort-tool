@@ -74,7 +74,9 @@ export function setBelt(W, pts2d) {
 // occ = 已占用（已落 / 先飞）的杯子世界位置 [[x, z, bottomY], ...]；返回 f(p) → [x, y, z]
 export function cupPath(W, from, to, occ) {
   const [x0, y0, z0] = from, [x1, y1, z1] = to, yClr = Math.max(y1, to[3] ?? y1) ; // to[3] = 托盘顶面 + 间隙（水平段末端高度）
-  const PH = 0.68, base = a => y0 + (yClr - y0) * a;
+  // 水平段：先在带面高度平移，直到整只杯子（含卷边）离开传送带末端平切面，再平滑下降到托盘顶面上方（不擦带体 / 挡边）
+  const PH = 0.68, Lh = Math.hypot(x1 - x0, z1 - z0) || 1, aHold = Math.min(0.85, (W.cupRT + W.cupRim + 1) / Lh), ssb = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
+  const base = a => a <= aHold ? y0 : y0 + (yClr - y0) * ssb((a - aHold) / (1 - aHold));
   // 越障：沿水平段采样，若与已占杯子水平重叠（含卷边 + 1.5 单位余量），该段杯底必须高于其杯口；
   // 抬升曲线 = 进入重叠段之前平滑抬起、重叠段内保持、离开后平滑落下（平顶，比正弦拱更低）
   const need = W.cupRT + W.cupRim, N = 60; let hop = 0, a0 = 1, a1 = 0;

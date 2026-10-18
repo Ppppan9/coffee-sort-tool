@@ -19,7 +19,10 @@
 - (d) ✅ three.js 页面实时 3D（src/three/scene3d.js；杯子 InstancedMesh；托盘挖孔+半球凹槽；纸箱四片铰链翻盖；阴影）；设置组“3D 渲染”
 - (e) ✅ 全部测试通过：test:logic（含暂存）/ npm test（67 托盘）/ test:shape / test:norec / test:drag / test:ae（PSNR≈33–37）/ test:3d（BLENDER PASS）。盒子无 GPU（SwiftShader 3D≈2fps），长流程测试切 2D（R3D=1 保持 3D），npm test 先校验 3D 场景
 - 手指：按用户要求改为麻将工具同款默认手指 PNG（src/default_hand.js，handRotation/handFlip/锚点与麻将一致，settings v5 migrate；可上传覆盖）
-- (f) v1.1.0 推送 + Pages 验证
+- (f) ✅ v1.1.0 已推送（19277b6）并在 GitHub Pages 上线（live index.html 与本地 cmp 一致）
 ## 剩余差距
 - AE 导出仍用 2D 精灵 PNG（非 3D 渲染图）；3D 导出（glTF/FBX）沿用原导出模型 + 纸箱翻盖/星星为关键帧四边形，尚未复用页面 three.js 模型（可用 GLTFExporter 接入）
 - 3D 相机/传送带颜色仅近似参考；纸箱 2D 精灵的翻盖为投影缩放近似
+
+## v1.2 进行中（2026-10-18 23:10 起）
+- 目标：(1) 3D 相机 + 棋盘/传送带/计数器颜色逐帧对齐参考并输出分区色差/位置差报告；(2) 纸箱折叠逐帧对比（screenshots/box_fold_ref_vs_tool.jpg）并修正时序/缓动/缩放/翻盖顺序；(3) 3D 导出复用页面 three.js 模型；(4) AE 导出 3D 渲染图层（默认在 3D 渲染开启时）。

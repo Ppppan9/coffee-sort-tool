@@ -4,6 +4,8 @@ const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', head
 const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
 const errs = []; p.on('pageerror', e => errs.push(String(e))); p.on('console', m => m.type() === 'error' && errs.push(m.text()));
 await p.goto('file://' + process.cwd() + '/index.html'); await p.waitForTimeout(500);
+// 盒子无 GPU（SwiftShader 软渲染 3D ≈2fps）：长流程测试默认用 2D 绘制（逻辑/导出同源），R3D=1 时保持 3D
+await p.evaluate(r => __game.set('render3d', r), !!process.env.R3D);
 let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 // 设计坐标 → 页面坐标
 const toPage = async (x, y) => p.evaluate(([x, y]) => { const cv = document.getElementById('stage'), r = cv.getBoundingClientRect(), k = cv.width / 720, oy = (cv.height - 1280 * k) / 2; return [r.left + x * k / cv.width * r.width, r.top + (y * k + oy) / cv.height * r.height]; }, [x, y]);

@@ -11,6 +11,8 @@ const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', head
 const p = await b.newPage({ viewport: { width: 1400, height: 1000 } }); const errs = [];
 p.on('pageerror', e => errs.push(String(e))); p.on('console', m => m.type() === 'error' && errs.push(m.text()));
 await p.goto('file://' + process.cwd() + '/index.html'); await p.waitForTimeout(400);
+// 盒子无 GPU（SwiftShader 软渲染 3D ≈2fps）：长流程测试默认用 2D 绘制（逻辑/导出同源），R3D=1 时保持 3D
+await p.evaluate(r => __game.set('render3d', r), !!process.env.R3D);
 await p.evaluate(() => { for (const [k, v] of Object.entries({ cols: 8, rows: 8, autoSpeed: 4, cupInterval: 40, cupFly: 50, boxGrow: 60, boxClose: 80, boxFlyDur: 100, slideSpeed: 25 })) __game.set(k, v); });
 await p.setInputFiles('#file_shapeImg', png); await p.waitForTimeout(1500);
 const info = await p.evaluate(() => ({ level: __game.S.level, tiles: __game.L.tiles.length, cells: __game.L.mask.reduce((s, v) => s + v, 0), mask: Array.from({ length: __game.L.rows }, (_, r) => Array.from({ length: __game.L.cols }, (_, c) => __game.L.mask[r * __game.L.cols + c] ? '#' : '.').join('')).join('/'), solvable: !!__game.solveNow() }));

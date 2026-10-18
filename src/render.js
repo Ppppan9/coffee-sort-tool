@@ -169,20 +169,32 @@ export function drawBelt(c, S, path, k) {
   strokeAll(1.18, 'rgba(60,40,10,0.28)', 16); strokeAll(1.08, S.beltSide, 12); strokeAll(1.08, shade(S.beltSide, 0.12), 6); strokeAll(1.04, shade(S.beltTop, 0.12), 0); strokeAll(0.86, S.beltSide, 1); strokeAll(0.8, S.beltTop, 1.5); strokeAll(0.4, shade(S.beltTop, -0.05), 1.5);
 }
 // ---------- 内置手 + 白色触控笔（笔尖在左上 = 锚点 0.05/0.05）----------
-export function defaultHand() {
-  const W = 320, H = 520, c = mk(W, H), g = c.getContext('2d');
-  // 触控笔
-  g.lineCap = 'round'; g.strokeStyle = '#e9e7e2'; g.lineWidth = 15; g.beginPath(); g.moveTo(18, 26); g.lineTo(250, 400); g.stroke();
-  g.strokeStyle = '#ffffff'; g.lineWidth = 7; g.beginPath(); g.moveTo(16, 22); g.lineTo(246, 392); g.stroke();
-  g.fillStyle = '#bfbab0'; g.beginPath(); g.moveTo(10, 12); g.lineTo(26, 22); g.lineTo(14, 32); g.closePath(); g.fill();
-  // 手
-  const skin = g.createLinearGradient(120, 200, 300, 500); skin.addColorStop(0, '#f6c9a8'); skin.addColorStop(1, '#e2a07c'); g.fillStyle = skin;
-  g.beginPath(); g.moveTo(150, 230); g.bezierCurveTo(120, 250, 110, 300, 140, 330); g.bezierCurveTo(170, 370, 200, 420, 210, 520); g.lineTo(320, 520); g.lineTo(320, 330); g.bezierCurveTo(300, 280, 260, 240, 220, 220); g.bezierCurveTo(190, 205, 165, 215, 150, 230); g.fill();
-  // 食指 + 拇指
-  g.beginPath(); g.moveTo(150, 232); g.bezierCurveTo(130, 215, 108, 196, 96, 185); g.bezierCurveTo(84, 175, 96, 160, 110, 168); g.bezierCurveTo(140, 188, 180, 210, 200, 222); g.fill();
-  g.beginPath(); g.moveTo(140, 300); g.bezierCurveTo(118, 290, 104, 266, 112, 250); g.bezierCurveTo(122, 236, 150, 250, 170, 268); g.fill();
-  g.strokeStyle = 'rgba(160,90,60,0.45)'; g.lineWidth = 2; g.beginPath(); g.moveTo(150, 232); g.bezierCurveTo(165, 245, 180, 255, 200, 262); g.stroke();
-  g.fillStyle = 'rgba(255,230,215,0.8)'; g.beginPath(); g.ellipse(100, 174, 9, 6, -0.6, 0, 7); g.fill();
+export function defaultHand() { // v1.1：按参考第 0 帧重绘：笔尖左上、笔身 55° 向右下，食指压在笔身上、拇指在下、其余手指蜷在右侧、前臂竖直向下
+  const W = 320, H = 520, c = mk(W, H), g = c.getContext('2d'); g.lineCap = 'round'; g.lineJoin = 'round';
+  const skin = (x0, y0, x1, y1) => { const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, '#fbd6bd'); gr.addColorStop(0.55, '#f0b896'); gr.addColorStop(1, '#d9946f'); return gr; };
+  const limb = (pts, w, fill) => { g.strokeStyle = fill; g.lineWidth = w; g.beginPath(); g.moveTo(...pts[0]); for (let i = 1; i < pts.length; i++) g.lineTo(...pts[i]); g.stroke(); };
+  // 柔和投影
+  g.fillStyle = 'rgba(60,40,20,0.18)'; g.beginPath(); g.ellipse(150, 170, 70, 85, -0.35, 0, 7); g.fill();
+  // 前臂
+  g.fillStyle = skin(90, 200, 200, 520); g.beginPath(); g.moveTo(88, 170); g.bezierCurveTo(92, 260, 100, 380, 104, 520); g.lineTo(196, 520); g.bezierCurveTo(192, 400, 186, 260, 182, 165); g.closePath(); g.fill();
+  // 手背 / 掌
+  g.fillStyle = skin(70, 60, 200, 230); g.beginPath(); g.moveTo(70, 120); g.bezierCurveTo(60, 70, 120, 48, 160, 66); g.bezierCurveTo(195, 82, 200, 150, 186, 196); g.bezierCurveTo(160, 228, 100, 222, 88, 186); g.bezierCurveTo(78, 162, 74, 140, 70, 120); g.fill();
+  // 蜷起的中指 / 无名指（右侧）
+  for (const [x, y, r] of [[172, 104, 20], [180, 134, 19], [178, 162, 17]]) { g.fillStyle = skin(x - r, y - r, x + r, y + r); g.beginPath(); g.ellipse(x, y, r, r * 0.8, 0.4, 0, 7); g.fill(); g.strokeStyle = 'rgba(170,95,60,0.35)'; g.lineWidth = 1.5; g.beginPath(); g.arc(x - 4, y, r * 0.7, -0.6, 1.2); g.stroke(); }
+  // 拇指（笔身下方）
+  limb([[100, 150], [74, 112], [58, 84]], 25, skin(50, 80, 110, 150)); g.fillStyle = 'rgba(255,235,225,0.75)'; g.beginPath(); g.ellipse(58, 84, 8, 6, -1, 0, 7); g.fill();
+  // 触控笔（白色，笔尖锥形灰）
+  const sg = g.createLinearGradient(0, 0, 14, -10); sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, '#ddd8cf');
+  g.strokeStyle = 'rgba(80,60,40,0.25)'; g.lineWidth = 13; g.beginPath(); g.moveTo(22, 34); g.lineTo(158, 228); g.stroke();
+  g.strokeStyle = '#f4f1ea'; g.lineWidth = 11; g.beginPath(); g.moveTo(20, 30); g.lineTo(155, 222); g.stroke();
+  g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.beginPath(); g.moveTo(19, 27); g.lineTo(152, 216); g.stroke();
+  g.fillStyle = '#b9b4aa'; g.beginPath(); g.moveTo(12, 18); g.lineTo(26, 26); g.lineTo(17, 37); g.closePath(); g.fill();
+  // 食指压在笔身上（指尖靠近笔尖）
+  limb([[150, 88], [100, 62], [52, 40], [40, 35]], 24, skin(40, 30, 150, 95));
+  g.fillStyle = 'rgba(255,238,228,0.85)'; g.beginPath(); g.ellipse(44, 34, 10, 7, -0.45, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(165,90,60,0.4)'; g.lineWidth = 1.6; for (const [x, y] of [[96, 62], [70, 50]]) { g.beginPath(); g.moveTo(x - 3, y - 9); g.quadraticCurveTo(x + 2, y, x - 2, y + 9); g.stroke(); }
+  // 高光
+  g.fillStyle = 'rgba(255,240,230,0.35)'; g.beginPath(); g.ellipse(120, 95, 30, 14, -0.4, 0, 7); g.fill();
   return c;
 }
 // ---------- 纸箱（v1.1：箱体 + 四片翻盖，翻盖绕折线连续翻折）----------

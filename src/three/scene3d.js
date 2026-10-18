@@ -2,6 +2,7 @@
 // 每个 2D 元素（托盘 / 杯子 / 纸箱 / 传送带 / 棋盘）按其屏幕锚点反投影到地面（y=0）得到世界坐标，尺寸按该处“世界单位/像素”换算，
 // 因此 3D 画面与点击 / 拖动命中、AE 关键帧位置一致；透视、光照、材质由设置项控制。
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { DW, DH, LANES } from '../render.js';
 
 const COLS = S => ({ brown: S.colBrown, cream: S.colCream, green: S.colGreen });
@@ -44,7 +45,12 @@ function tileGeo(R, S, w) {
   const body = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 3, curveSegments: 16 }); body.rotateX(-Math.PI / 2);
   const prof = []; for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI / 2; prof.push(new THREE.Vector2(Math.max(0.001, br * Math.sin(a)), th + 0.03 - Math.min(br * 0.8, th * 0.8) * Math.cos(a))); }
   const bowl = new THREE.LatheGeometry(prof, 24);
-  return (R.geos[k] = { body, bowl, slots, th: th + 0.03 });
+  // 托盘体 + 凹槽合并为一个几何体（每个托盘 1 次绘制）
+  const parts = [body.toNonIndexed ? (body.index ? body.toNonIndexed() : body) : body]; body.clearGroups();
+  for (const [x, y] of slots) { const b2 = bowl.clone().toNonIndexed(); b2.translate(x, 0, -y); parts.push(b2); }
+  parts.forEach(g2 => { g2.clearGroups(); for (const n of Object.keys(g2.attributes)) if (!['position', 'normal', 'uv'].includes(n)) g2.deleteAttribute(n); });
+  const merged = mergeGeometries(parts, false) || body;
+  return (R.geos[k] = { body: merged, bowl, slots: [], th: th + 0.03 });
 }
 function cupGeo(R) {
   if (R.geos.cup) return R.geos.cup;
@@ -56,7 +62,7 @@ function cupGeo(R) {
 // ---------- 静态：传送带 + 棋盘 ----------
 function setup(R, S, L, G, belt) {
   setCamera(R, S);
-  R.statics.clear(); R.pool.forEach(o => R.dyn.remove(o.obj)); R.pool.clear(); R.mats = {}; R.geos = {};
+  R.statics.clear(); if (R.cupInst) { for (const c in R.cupInst) R.cupInst[c].forEach(m => R.scene.remove(m)); R.cupInst = null; } R.pool.forEach(o => R.dyn.remove(o.obj)); R.pool.clear(); R.mats = {}; R.geos = {};
   R.S = S; R.G = G; R.L = L;
   const sunDir = new THREE.Vector3().setFromSphericalCoords(1, (90 - S.light3dElev) * Math.PI / 180, S.light3dAzim * Math.PI / 180);
   R.sunDir = sunDir;
@@ -104,9 +110,9 @@ function setup(R, S, L, G, belt) {
 function getObj(R, id, make) { let o = R.pool.get(id); if (!o) { o = { obj: make() }; R.pool.set(id, o); R.dyn.add(o.obj); } o.used = true; return o.obj; }
 function makeTile(R, S, color, w) {
   const g = tileGeo(R, S, w), m = mat(R, 'tile_' + color, () => new THREE.MeshPhysicalMaterial({ color: COLS(S)[color], roughness: S.mat3dTileRough, clearcoat: S.mat3dTileClearcoat, clearcoatRoughness: 0.4, sheen: 0.3 }));
-  const grp = new THREE.Group(), body = new THREE.Mesh(g.body, m); body.castShadow = true; body.receiveShadow = true; grp.add(body);
+  const grp = new THREE.Group(), mm = m.clone(), body = new THREE.Mesh(g.body, mm); body.castShadow = true; body.receiveShadow = true; grp.add(body);
   for (const [x, y] of g.slots) { const b = new THREE.Mesh(g.bowl, mat(R, 'bowl_' + color, () => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(COLS(S)[color]).multiplyScalar(0.85), roughness: S.mat3dTileRough, clearcoat: S.mat3dTileClearcoat * 0.6, side: THREE.DoubleSide }))); b.position.set(x, 0, -y); b.receiveShadow = true; grp.add(b); }
-  grp.userData = { m }; return grp;
+  grp.userData = { m: mm }; return grp;
 }
 function makeCup(R, S, color) {
   const g = cupGeo(R), [bc, lc] = CUPC(S)[color], grp = new THREE.Group();
@@ -137,11 +143,18 @@ function layoutBox(box, W, D, H, thS, thF) {
   fl('B', W, D / 2, 0, -D / 2, 0, D / 4); p.flapB.rotation.set(-thF, 0, 0);
   fl('F', W, D / 2, 0, D / 2, 0, -D / 4); p.flapF.rotation.set(thF, 0, 0);
 }
+const M4 = new THREE.Matrix4(), V3 = new THREE.Vector3(), Q0 = new THREE.Quaternion(), SC = new THREE.Vector3();
+function updateCups(R, S, by) {
+  const g = cupGeo(R), N = 1200;
+  if (!R.cupInst) { R.cupInst = {}; for (const color of ['brown', 'cream', 'green']) { const [bc, lc] = CUPC(S)[color], mk2 = (geo, m) => { const im = new THREE.InstancedMesh(geo, m, N); im.castShadow = true; im.frustumCulled = false; R.scene.add(im); return im; };
+    R.cupInst[color] = [mk2(g.body, new THREE.MeshStandardMaterial({ color: bc, roughness: S.mat3dCupRough, side: THREE.DoubleSide })), mk2(g.rim, new THREE.MeshStandardMaterial({ color: 0xfbfbf5, roughness: 0.5 })), mk2(g.liq, new THREE.MeshStandardMaterial({ color: lc, roughness: 0.35 }))]; R.cupInst[color][2].castShadow = false; } }
+  for (const color in R.cupInst) { const list = by[color] || []; for (const im of R.cupInst[color]) { const n = Math.min(N, list.length); for (let i = 0; i < n; i++) im.setMatrixAt(i, list[i]); im.count = n; im.instanceMatrix.needsUpdate = true; } }
+}
 export const IS3D = a => a === 'belt' || a === 'board' || /^(tile_|cup_|boxbody_|boxflap_)/.test(a);
 function render(R, items, S, w, h) {
   if (R.renderer.domElement.width !== w || R.renderer.domElement.height !== h) R.renderer.setSize(w, h, false);
   R.renderer.shadowMap.enabled = !!S.shadow3d; R.hemi.intensity = S.light3dAmbient; R.sun.intensity = S.light3dSun; R.ground.material.opacity = S.shadow3dOpacity;
-  R.pool.forEach(o => o.used = false);
+  R.pool.forEach(o => o.used = false); const cupsBy = {};
   for (const it of items) {
     const a = it.asset; if (!IS3D(a) || a === 'belt' || a === 'board' || it.op <= 0.01) continue;
     if (a.startsWith('tile_')) {
@@ -149,15 +162,17 @@ function render(R, items, S, w, h) {
       const obj = getObj(R, it.id, () => makeTile(R, S, color, +w2)), sc = R.wpp(it.x, it.y) * S.cellW;
       const p = R.unproj(it.x, it.y), k2 = sc * it.sx; obj.position.copy(p); obj.scale.set(k2, k2, k2 * (it.sy / it.sx) / (R.G.sy(0) / R.G.sx(0)) * 0 + k2);
       obj.userData.m.emissive.setRGB(0, 0, 0); R.pool.get(it.id).flash = 0;
-    } else if (a.startsWith('cup_')) {
-      const color = a.slice(4), obj = getObj(R, it.id, () => makeCup(R, S, color)), wp = R.wpp(it.x, it.y), sc = S.cupSize * wp * it.sx * S.cup3dScale;
-      const onBelt = it.z < 3, p = R.unproj(it.x, it.y); obj.position.set(p.x, onBelt ? R.beltTopH * wp : (it.z >= 49 ? S.tile3dThick * S.cellW * wp * 0.6 : 0), p.z); obj.scale.set(sc, sc * (it.sy / it.sx), sc);
+    } else if (a.startsWith('cup_')) { // 杯子用 InstancedMesh（每色一批），数百个杯子也只有几次绘制调用
+      const color = a.slice(4), wp = R.wpp(it.x, it.y), sc = S.cupSize * wp * it.sx * S.cup3dScale, onBelt = it.z < 3, p = R.unproj(it.x, it.y);
+      M4.compose(V3.set(p.x, onBelt ? R.beltTopH * wp : (it.z >= 49 ? S.tile3dThick * S.cellW * wp * 0.6 : 0), p.z), Q0, SC.set(sc, sc * (it.sy / it.sx), sc));
+      (cupsBy[color] || (cupsBy[color] = [])).push(M4.clone());
     } else if (a.startsWith('boxbody_') && it.meta) {
       const m = it.meta, obj = getObj(R, it.id, () => makeBox(R, S)), wp = R.wpp(it.x, it.y), p = R.unproj(it.x, it.y);
       obj.position.set(p.x, m.lift * wp * 0.5, p.z); const W = m.W * wp, D = m.D * wp, H = m.H * wp; layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1);
       obj.traverse(o => { if (o.material) { o.material.transparent = it.op < 1; o.material.opacity = it.op; } });
     }
   }
+  updateCups(R, S, cupsBy);
   R.pool.forEach((o, id) => { o.obj.visible = !!o.used; if (o.flash && o.obj.userData.m) o.obj.userData.m.emissive.setRGB(o.flash * 0.6, 0, 0); });
   for (const [id, o] of R.pool) if (!o.used && R.pool.size > 600) { R.dyn.remove(o.obj); R.pool.delete(id); }
   R.renderer.render(R.scene, R.camera);

@@ -3,6 +3,8 @@ import { chromium } from 'playwright-core';
 const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const p = await b.newPage(); const errs = []; p.on('pageerror', e => errs.push(String(e)));
 await p.goto('file://' + process.cwd() + '/index.html'); await p.waitForTimeout(400);
+// 盒子无 GPU（SwiftShader 软渲染 3D ≈2fps）：长流程测试默认用 2D 绘制（逻辑/导出同源），R3D=1 时保持 3D
+await p.evaluate(r => __game.set('render3d', r), !!process.env.R3D);
 const r = {};
 r.defaults = await p.evaluate(() => ({ autoRec: __game.S.autoRec, aeWithRec: __game.S.aeWithRec }));
 await p.evaluate(() => { setTimeout(() => __game.autoSolve(), 0); }); await p.waitForTimeout(1500);

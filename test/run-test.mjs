@@ -7,6 +7,10 @@ const errs = []; p.on('pageerror', e => errs.push(String(e))); p.on('console', m
 await p.goto('file://' + process.cwd() + '/index.html'); await p.waitForTimeout(500);
 const shot = async n => fs.writeFileSync(`screenshots/${n}.png`, Buffer.from((await p.evaluate(() => document.getElementById('stage').toDataURL('image/png'))).split(',')[1], 'base64'));
 await shot('tool_start');
+// 3D 渲染检查：three.js 场景存在、WebGL 画面非空（托盘 / 杯子实例数）
+const r3 = await p.evaluate(() => { const R = __game.r3d; if (!R) return null; let inst = 0; for (const c in (R.cupInst || {})) inst += R.cupInst[c][0].count; return { tiles: [...R.pool.values()].filter(o => o.obj.visible).length, cups: inst, statics: R.statics.children.length }; });
+console.log('3D', JSON.stringify(r3)); if (!r3 || r3.tiles < 60 || r3.cups < 100) { console.log('FAIL 3D scene'); process.exit(1); }
+if (!process.env.R3D) await p.evaluate(() => __game.set('render3d', false)); // 无 GPU：长流程用 2D
 const fast = +(process.env.FAST || 2.5);
 await p.evaluate(f => { for (const [k, v] of Object.entries({ autoSpeed: f, cupInterval: Math.round(200 / f), cupFly: Math.round(150 / f), boxGrow: Math.round(300 / f), boxClose: Math.round(450 / f), boxFlyDur: Math.round(400 / f), slideSpeed: 6 * f })) __game.set(k, v); }, fast);
 const t0 = Date.now();

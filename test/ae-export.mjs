@@ -6,6 +6,8 @@ const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', head
 const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
 const errs = []; p.on('pageerror', e => errs.push(String(e))); p.on('console', m => m.type() === 'error' && errs.push(m.text()));
 await p.goto('file://' + process.cwd() + '/index.html'); await p.waitForTimeout(400);
+// 盒子无 GPU（SwiftShader 软渲染 3D ≈2fps）：长流程测试默认用 2D 绘制（逻辑/导出同源），R3D=1 时保持 3D
+await p.evaluate(r => __game.set('render3d', r), !!process.env.R3D);
 await p.evaluate(() => { for (const [k, v] of Object.entries({ level: 'random', rows: 3, cols: 8, seed: 7, wideChance: 0.2, endCard: true, autoSpeed: 2, cupInterval: 90, boxGrow: 160, boxClose: 220, boxFlyDur: 260, autoStartDelay: 100 })) __game.set(k, v); });
 await p.evaluate(n => { window.__aeSnapEvery = n; __game.aeStart(); setTimeout(() => __game.autoSolve(), 0); __game.aeRec.rec.snapEvery = n; __game.aeRec.rec.maxSnaps = 60; }, +(process.env.SNAP_EVERY || 20));
 const t0 = Date.now();

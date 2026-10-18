@@ -8,7 +8,7 @@
     "test": "node test/run-test.mjs",
     "test:logic": "node test/logic-test.mjs",
     "test:ae": "node test/ae-export.mjs && node test/ae-mock.mjs /workspace/coffee_ae_sample.zip && node test/ae-composite.mjs",
-    "test:3d": "E3D=1 node test/ae-export.mjs && bash test/export3d-blender.sh",
+    "test:3d": "R3D=1 E3D=1 node test/ae-export.mjs && bash test/export3d-blender.sh",
     "test:shape": "node test/shape-test.mjs",
     "test:norec": "node test/no-autorec.mjs",
     "test:drag": "node test/drag-test.mjs"

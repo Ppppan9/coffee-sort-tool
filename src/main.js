@@ -180,7 +180,7 @@ function scene(t) {
   const boxAt = (j, bw, x, y, s, thSide, thFB, grow, op, z) => {
     const id = 'box_' + j.i, sx = dsx * s, sy = dsy * s, lf = dockXY[1] - y, add2 = (n, asset, dx, dy, o) => add(id + n, asset, x + dx * sx, y + dy * sy, { z: z + (o.dz || 0), op, sx: sx * (o.sx ?? 1), sy: sy * (o.sy ?? 1), lift: lf });
     const W = boxDims(S, bw).W, D = BD;
-    add2('_body', `boxbody_${bw}`, 0, 0, { sy: 1, dz: 0 }); out[out.length - 1].meta = { w: bw, W: W * sx, D: D * sx, H: BH * sx * grow, grow, thS: thSide, thF: thFB, lift: lf };
+    add2('_body', `boxbody_${bw}`, 0, 0, { sy: 1, dz: 0 }); out[out.length - 1].meta = { w: bw, W: W * sx, D: D * sx, H: BH * sx * grow, grow, thS: thSide, thF: thFB, lift: lf, ph: j.ph, color: st.tiles[j.i].color };
     add2('_front', `boxfront_${bw}`, 0, D / 2, { sy: Math.max(0.01, grow), dz: 0.001 }); // 正面（随出现进度向下长出）
     const fl = (th, kind, n, dx, dy, dir, dz) => { const c = Math.cos(th), f = c >= 0 ? 'out' : 'in', proj = c >= 0 ? c : c * (kind === 'fb' ? 1.7 : 1); add2(n, `boxflap_${kind}_${f}_${bw}`, dx, dy, kind === 'side' ? { sx: proj * dir, dz } : { sy: proj * dir, dz }); };
     // 背盖、左右盖、前盖（合上时前盖最上层）
@@ -435,7 +435,7 @@ async function doExportAE(save = true, r0 = curRec()) {
 async function doExport3D(save = true, r0 = curRec()) {
   if (!r0) { toast('请先用“开始记录”记录一段（自动通关或手动游玩）'); return null; }
   status('正在生成 3D 动画…'); const ae = await aeRec.exportZip(r0, { aeFps: String(+S.export3dFps || 30), aeSize: 'canvas', aeSampling: 'bake', aeNames: 'en', aeAudio: 'both' });
-  const r = await export3D({ S: { ...r0.S, export3dFps: S.export3dFps, export3dHand: S.export3dHand, export3dTiles: S.export3dTiles, endCardHand: S.endCardHand }, ae, rec: r0, A });
+  const r = await export3D({ S: { ...r0.S, export3dFps: S.export3dFps, export3dHand: S.export3dHand, endCardHand: S.endCardHand }, ae, rec: r0, A, G, belt });
   window.__e3dLast = r; if (save) download(r.blob, r.name); status(`3D 动画：${r.stats.nodes} 节点，${r.duration.toFixed(2)}s`); return r;
 }
 

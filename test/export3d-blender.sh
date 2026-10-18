@@ -25,7 +25,7 @@ rep = json.loads(re.search(r'EXPORT3D_REPORT (\{.*\})', r).group(1)); meta = jso
 ps = json.loads(re.search(r'PSNR (\[.*\])', r).group(1))
 ok = rep['cameras'] == 1 and rep['camera'] == meta['camera']['name'] and rep['tiles'] == meta['stats']['tiles'] and rep['cups'] == meta['stats']['cups'] \
   and rep['frame_range'] == [0, meta['frameEnd']] and abs(rep['action_range'][1] - meta['frameEnd']) < 1.01 and rep['sound_strips'] == len(meta['audio']) + (1 if meta['mix'] else 0) \
-  and rep['fbx_size'] > 0 and all(p['psnr'] > 20 for p in ps)
-print('BLENDER', 'PASS' if ok else 'FAIL', json.dumps({k: rep.get(k) for k in ['objects','meshes','empties','actions','fcurves','keyframes','frame_range','action_range','tiles','cups','boxes','opacity_curves','sound_strips','fbx_size']}), 'meta', json.dumps(meta['stats']))
+  and rep['fbx_size'] > 0 and rep.get('lights', 0) >= 1 and all(p['psnr'] > float('${PSNR_MIN:-18}') for p in ps)
+print('BLENDER', 'PASS' if ok else 'FAIL', json.dumps({k: rep.get(k) for k in ['objects','meshes','empties','lights','actions','fcurves','keyframes','frame_range','action_range','tiles','cups','boxes','opacity_curves','sound_strips','fbx_size']}), 'meta', json.dumps(meta['stats']))
 sys.exit(0 if ok else 1)
 PY

@@ -36,7 +36,8 @@ export function createAERecorder(api) {
     for (const it of E.items) {
       const key = it.id + '|' + it.asset; let tr = R.tracks.get(key);
       if (!tr) { tr = { id: it.id, asset: it.asset, z: it.z, s: [], order: R.tracks.size }; R.tracks.set(key, tr); }
-      tr.s.push([t, r3(it.x), r3(it.y), r3(it.sx), r3(it.sy), r3(it.rot), r3(it.op), f]);
+      tr.s.push([t, r3(it.x), r3(it.y), r3(it.sx), r3(it.sy), r3(it.rot), r3(it.op), f, r3(it.lift || 0), r3(it.z)]);
+      if (it.meta) (tr.m || (tr.m = new Map())).set(f, { ...it.meta }); // 纸箱：尺寸 / 翻盖角度 / 阶段（3D 导出与 AE 3D 外观用）
     }
     if (R.snapEvery && f % R.snapEvery === R.snapEvery - 1 && R.snaps.length < R.maxSnaps) R.snaps.push({ t, url: E.canvas.toDataURL('image/png') });
     R.lastT = t; R.frames++;
@@ -133,7 +134,7 @@ export function createAERecorder(api) {
     await Promise.all(pending);
     const enc = new TextEncoder();
     const files = [{ name: 'build_ae_project.jsx', data: enc.encode(JSX_TEXT) }, { name: 'timeline.json', data: enc.encode(JSON.stringify(timeline)) }, { name: 'README_AE.md', data: enc.encode(README_TEXT) }, ...assetFiles.sort((a, b) => a.name < b.name ? -1 : 1), ...audioFiles];
-    return { blob: makeZip(files), name: `coffee_ae_export_${stamp}.zip`, timeline, stats, files: files.length, fileList: files, snaps: rec.snaps.map(s => s.t), segs: segs.map(g => ({ id: g.tr.id, asset: g.tr.asset, z: g.tr.z, s: g.s })) };
+    return { blob: makeZip(files), name: `coffee_ae_export_${stamp}.zip`, timeline, stats, files: files.length, fileList: files, snaps: rec.snaps.map(s => s.t), segs: segs.map(g => ({ id: g.tr.id, asset: g.tr.asset, z: g.tr.z, s: g.s, m: g.tr.m || null })) };
   }
   return { start, stop, sample, exportZip, get rec() { return R; }, set rec(v) { R = v; } };
 }

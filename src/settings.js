@@ -190,7 +190,6 @@ export const GROUPS = [
     ['_export3d', '用上一次 AE 记录生成 glTF 场景 + Blender 脚本 + 音频', 'button', 'export3d', '导出 3D 动画 (glTF/FBX/Blender)'],
     ['export3dFps', '3D 动画帧率', 'select', '30', [['24', '24'], ['25', '25'], ['30', '30'], ['60', '60']]],
     ['export3dHand', '包含手指（贴图平面；结束页是否显示仍按“结束页显示手指”）', 'bool', true],
-    ['export3dTiles', '托盘形式', 'select', 'mesh', [['mesh', '3D 网格（圆角托盘 + 半球凹槽）'], ['quad', '贴图四边形']]],
   ]],
   ['结束页(End Card)', [
     ['endCard', '显示结束页', 'bool', false],

@@ -6,7 +6,7 @@
   2) 命令行：blender --background --python blender_import.py -- [--fbx] [--save] [--render 0,30,60] [--out DIR] [--engine CYCLES|EEVEE] [--verify]
 
 做的事：导入 scene.glb → 帧率/帧范围 → 正交俯视相机设为活动相机、分辨率与网页一致 →
-材质改为“自发光 + 透明”（与网页的平面无光照效果一致）→ scene3d.json 里的淡入淡出曲线烘到材质 Alpha →
+v1.2：3D 模型保留 PBR 材质 + 太阳光/环境光（与页面 three.js 一致），2D 叠加层（mat_*）改为“自发光 + 透明”→ scene3d.json 里的淡入淡出曲线烘到材质 Alpha →
 audio/*.wav 按时间加到视频序列编辑器（逐事件音效 + 静音的混合音轨）→ 可选导出 scene.fbx（给 C4D / UE5）。
 """
 import bpy, json, os, sys, math, struct, re
@@ -65,10 +65,22 @@ if cam is None:
     cam = next((o for o in bpy.data.objects if o.type == "CAMERA"), None)
 if cam:
     scene.camera = cam
-    cam.data.type = "ORTHO"
-    cam.data.ortho_scale = meta["camera"]["orthoScale"]
-    cam.data.sensor_fit = "AUTO"
-    cam.data.clip_start, cam.data.clip_end = 0.01, 50
+    C = meta["camera"]
+    if C.get("type") == "perspective":  # v1.2：与页面 3D 渲染同一透视相机（FOV / 俯角 / 距离）
+        cam.data.type = "PERSP"
+        cam.data.sensor_fit = "VERTICAL"
+        cam.data.angle_y = math.radians(C["yfov"])
+        cam.data.clip_start, cam.data.clip_end = C.get("near", 0.05), C.get("far", 40)
+    else:
+        cam.data.type = "ORTHO"
+        cam.data.ortho_scale = C["orthoScale"]
+        cam.data.sensor_fit = "AUTO"
+        cam.data.clip_start, cam.data.clip_end = 0.01, 50
+# 灯光：three.js 物理光照 → Blender（太阳强度 = 照度；半球环境光 → 世界背景 = 强度/π × 天空/地面色加权）
+LI = meta.get("lights")
+def hex_lin(h):
+    v = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    return [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in v]
 scene.render.resolution_x = int(meta["width"])
 scene.render.resolution_y = int(meta["height"])
 scene.render.resolution_percentage = 100
@@ -85,6 +97,16 @@ bg = scene.world.node_tree.nodes.get("Background")
 if bg:
     bg.inputs[0].default_value = (0, 0, 0, 1)
     bg.inputs[1].default_value = 0
+    if LI:
+        sky, gnd = hex_lin(LI["ambient"]["sky"]), hex_lin(LI["ambient"]["ground"])
+        col = [0.7 * a + 0.3 * b for a, b in zip(sky, gnd)]
+        bg.inputs[0].default_value = (col[0], col[1], col[2], 1)
+        bg.inputs[1].default_value = LI["ambient"]["intensity"] / math.pi
+if LI:
+    for o in bpy.data.objects:
+        if o.type == "LIGHT" and o.data.type == "SUN":
+            o.data.energy = LI["sun"]["intensity"]
+            o.data.angle = math.radians(8)
 
 # 材质：自发光 + 透明（平面无光照，与网页一致）
 def first_image(mat):
@@ -203,20 +225,21 @@ report = {"objects": len(bpy.data.objects), "meshes": sum(1 for o in bpy.data.ob
           "keyframes": sum(len(fc.keyframe_points) for a in bpy.data.actions for fc in a.fcurves),
           "frame_range": [scene.frame_start, scene.frame_end], "action_range": [lo, hi], "offset": OFF, "fps": fps,
           "sound_strips": n_snd,
+          "lights": sum(1 for o in bpy.data.objects if o.type == "LIGHT"),
           "tiles": sum(1 for o in bpy.data.objects if re.match(r"^tile_\d+(_s\d+)?$", o.name)),
           "cups": sum(1 for o in bpy.data.objects if re.match(r"^cup_\d+(_s\d+)?$", o.name)),
           "boxes": sum(1 for o in bpy.data.objects if re.match(r"^box_", o.name) and not o.name.endswith(("_vis", "_q"))),
           "camera": scene.camera.name if scene.camera else None, "resolution": [scene.render.resolution_x, scene.render.resolution_y]}
 
 os.makedirs(OUT, exist_ok=True)
-MATS = [m for m in bpy.data.materials if m.users]
+MATS = [m for m in bpy.data.materials if m.users and (m.name.startswith("mat_") or not LI)]  # v1.2：只把 2D 叠加层（mat_*）改为自发光；3D 模型（pbr_*）保留 PBR
 for m in MATS:
     info(m)
 if DO_FBX:
     for m in MATS:
         principled(m)
     fbx = os.path.join(OUT, "scene.fbx")
-    bpy.ops.export_scene.fbx(filepath=fbx, use_selection=False, object_types={"MESH", "CAMERA", "EMPTY"},
+    bpy.ops.export_scene.fbx(filepath=fbx, use_selection=False, object_types={"MESH", "CAMERA", "EMPTY", "LIGHT"},
                              bake_anim=True, bake_anim_use_all_bones=False, bake_anim_use_nla_strips=False, bake_anim_use_all_actions=False,
                              bake_anim_force_startend_keying=True, bake_anim_step=1.0, bake_anim_simplify_factor=1.0,
                              path_mode="COPY", embed_textures=True, axis_forward="-Z", axis_up="Y", apply_unit_scale=True, add_leaf_bones=False, colors_type="SRGB")

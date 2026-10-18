@@ -8,18 +8,18 @@ import { DW, DH, LANES } from '../render.js';
 const COLS = S => ({ brown: S.colBrown, cream: S.colCream, green: S.colGreen });
 const CUPC = S => ({ brown: [S.cupBrown, S.cupBrownLiq], cream: [S.cupCream, S.cupCreamLiq], green: [S.cupGreen, S.cupGreenLiq] });
 
-export function create3D() {
-  const canvas = document.createElement('canvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0);
+// opts.exportMode：不建 WebGL 渲染器，杯子不用 InstancedMesh（每杯一个节点），对象池不回收 → 供 3D 导出（glTF/FBX）逐帧采样同一套模型
+export function create3D(opts = {}) {
+  const canvas = opts.exportMode ? null : document.createElement('canvas');
+  const renderer = opts.exportMode ? null : new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+  if (renderer) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0); }
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(30, DW / DH, 10, 20000);
   const hemi = new THREE.HemisphereLight(0xffffff, 0x9a8460, 1), sun = new THREE.DirectionalLight(0xffffff, 2);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.6;
   scene.add(hemi, sun, sun.target);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000), new THREE.ShadowMaterial({ opacity: 0.25 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
   const statics = new THREE.Group(), dyn = new THREE.Group(); scene.add(statics, dyn);
-  const R = { canvas, renderer, scene, camera, statics, dyn, hemi, sun, ground, pool: new Map(), key: '', mats: {}, geos: {} };
+  const R = { canvas, renderer, scene, camera, statics, dyn, hemi, sun, ground, pool: new Map(), key: '', mats: {}, geos: {}, exportMode: !!opts.exportMode };
   const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), v3 = new THREE.Vector3();
   // 设计坐标 (x,y) → 地面世界坐标
   R.unproj = (x, y, h = 0) => { plane.constant = -h; ray.setFromCamera({ x: x / (DW / 2) - 1, y: 1 - y / (DH / 2) }, camera); const p = new THREE.Vector3(); return ray.ray.intersectPlane(plane, p) ? p : new THREE.Vector3(x, h, y); };
@@ -34,10 +34,11 @@ export function create3D() {
   R.wpp = (x, y) => R.unproj(x - 0.5, y).distanceTo(R.unproj(x + 0.5, y)); // 世界单位 / 像素
   R.setup = (S, L, G, belt) => setup(R, S, L, G, belt);
   R.render = (items, S, w, h) => render(R, items, S, w, h);
-  R.dispose = () => renderer.dispose();
+  R.apply = (items, S) => apply(R, items, S);
+  R.dispose = () => renderer && renderer.dispose();
   return R;
 }
-function mat(R, key, mk) { return R.mats[key] || (R.mats[key] = mk()); }
+function mat(R, key, mk) { if (!R.mats[key]) { const m = mk(); m.name = 'pbr_' + key; R.mats[key] = m; } return R.mats[key]; }
 function setCamera(R, S) {
   const c = R.camera, pitch = S.cam3dPitch * Math.PI / 180, d = S.cam3dDist;
   c.fov = S.cam3dFov; c.aspect = DW / DH; c.position.set(0, d * Math.sin(pitch), d * Math.cos(pitch)); c.up.set(0, 1, 0); c.lookAt(0, 0, 0); c.updateProjectionMatrix(); c.updateMatrixWorld();
@@ -101,7 +102,7 @@ export function beltMesh(R, S, belt) {
     const fn = P(b).sub(P(a)).cross(P(c).sub(P(a))); if (fn.x * nor[a * 3] + fn.y * nor[a * 3 + 1] + fn.z * nor[a * 3 + 2] < 0) { ind[t + 1] = c; ind[t + 2] = b; }
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(ind);
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: S.mat3dBeltRough, metalness: 0, side: THREE.FrontSide })); m.name = 'belt'; m.castShadow = false; m.receiveShadow = true; return m;
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: S.mat3dBeltRough, metalness: 0, side: THREE.FrontSide })); m.name = 'belt'; m.material.name = 'pbr_belt'; m.castShadow = false; m.receiveShadow = true; return m;
 }
 function setup(R, S, L, G, belt) {
   setCamera(R, S);
@@ -113,12 +114,12 @@ function setup(R, S, L, G, belt) {
   R.statics.add(beltMesh(R, S, belt));
   R.beltTopH = S.belt3dHeight; // 像素单位，杯子底高度 = beltTopH * wpp
   // 棋盘：底板（每个掩码格一块）+ 外框
-  const floorM = new THREE.MeshStandardMaterial({ color: S.floorColor, roughness: 0.7 }), frameM = new THREE.MeshStandardMaterial({ color: S.frameColor, roughness: 0.55 });
+  const floorM = new THREE.MeshStandardMaterial({ color: S.floorColor, roughness: 0.7 }), frameM = new THREE.MeshStandardMaterial({ color: S.frameColor, roughness: 0.55 }); floorM.name = 'pbr_board_floor'; frameM.name = 'pbr_board_frame';
   const quad = (pA, pB, pC, pD, h, m) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([pA.x, h, pA.z, pB.x, h, pB.z, pC.x, h, pC.z, pD.x, h, pD.z], 3)); g.setIndex([0, 2, 1, 1, 2, 3]); g.computeVertexNormals(); const me = new THREE.Mesh(g, m); me.receiveShadow = true; return me; };
   const W = (u, v) => { const [x, y] = G.P(u, v); return R.unproj(x, y); };
-  for (let r = 0; r < L.rows; r++) for (let c = 0; c < L.cols; c++) if (L.mask[r * L.cols + c]) R.statics.add(quad(W(c, r), W(c + 1, r), W(c, r + 1), W(c + 1, r + 1), 0.5, floorM));
+  for (let r = 0; r < L.rows; r++) for (let c = 0; c < L.cols; c++) if (L.mask[r * L.cols + c]) { const q = quad(W(c, r), W(c + 1, r), W(c, r + 1), W(c + 1, r + 1), 0.5, floorM); q.name = `board_floor_${r}_${c}`; R.statics.add(q); }
   // 外框：沿棋盘外边缘一圈的厚边（简单矩形框）
-  const fw = S.frameW / S.cellW, fr = (u0, v0, u1, v1) => { const sc = R.wpp(...G.P((u0 + u1) / 2, (v0 + v1) / 2)), h = S.frame3dHeight * sc, WH = (u, v) => R.unproj(...G.P(u, v), h), a = WH(u0, v0), b = WH(u1, v0), c2 = WH(u0, v1), d = WH(u1, v1); const g = new THREE.BufferGeometry(); const P = [a, b, c2, d]; const pos = []; P.forEach(p => pos.push(p.x, h, p.z)); P.forEach(p => pos.push(p.x, 0, p.z)); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex([0, 2, 1, 1, 2, 3, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 5, 3, 7, 0, 1, 4, 4, 1, 5]); g.computeVertexNormals(); const m = new THREE.Mesh(g, frameM); m.castShadow = true; m.receiveShadow = true; R.statics.add(m); };
+  const fw = S.frameW / S.cellW, fr = (u0, v0, u1, v1) => { const sc = R.wpp(...G.P((u0 + u1) / 2, (v0 + v1) / 2)), h = S.frame3dHeight * sc, WH = (u, v) => R.unproj(...G.P(u, v), h), a = WH(u0, v0), b = WH(u1, v0), c2 = WH(u0, v1), d = WH(u1, v1); const g = new THREE.BufferGeometry(); const P = [a, b, c2, d]; const pos = []; P.forEach(p => pos.push(p.x, h, p.z)); P.forEach(p => pos.push(p.x, 0, p.z)); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex([0, 2, 1, 1, 2, 3, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 5, 3, 7, 0, 1, 4, 4, 1, 5]); g.computeVertexNormals(); const m = new THREE.Mesh(g, frameM); m.name = 'board_frame_' + R.statics.children.length; m.castShadow = true; m.receiveShadow = true; R.statics.add(m); };
   fr(-fw, -fw, 0, L.rows + fw); fr(L.cols, -fw, L.cols + fw, L.rows + fw); fr(0, L.rows, L.cols, L.rows + fw);
   fr(0, -fw, L.cols / 2 - 1, 0); fr(L.cols / 2 + 1, -fw, L.cols, 0);
   // 灯光：阴影范围覆盖整个画面
@@ -127,7 +128,7 @@ function setup(R, S, L, G, belt) {
   const cam = R.sun.shadow.camera; cam.left = -span; cam.right = span; cam.top = span; cam.bottom = -span; cam.near = 1; cam.far = span * 5; cam.updateProjectionMatrix();
 }
 // ---------- 动态元素 ----------
-function getObj(R, id, make) { let o = R.pool.get(id); if (!o) { o = { obj: make() }; R.pool.set(id, o); R.dyn.add(o.obj); } o.used = true; return o.obj; }
+function getObj(R, id, make) { let o = R.pool.get(id); if (!o) { o = { obj: make() }; o.obj.name = id; o.obj.children.forEach((c, k) => { c.name = id + '_' + (c.userData.part || k); c.children.forEach((cc, kk) => cc.name = c.name + '_' + kk); }); R.pool.set(id, o); R.dyn.add(o.obj); } o.used = true; return o.obj; }
 function makeTile(R, S, color, w) {
   const g = tileGeo(R, S, w), m = mat(R, 'tile_' + color, () => new THREE.MeshPhysicalMaterial({ color: COLS(S)[color], roughness: S.mat3dTileRough, clearcoat: S.mat3dTileClearcoat, clearcoatRoughness: 0.4, specularIntensity: S.mat3dSpecular ?? 0.3 }));
   const grp = new THREE.Group(), mm = m.clone(), body = new THREE.Mesh(g.body, mm); body.castShadow = true; body.receiveShadow = true; grp.add(body);
@@ -144,9 +145,9 @@ function makeBox(R, S) {
   const m = mat(R, 'kraft', () => new THREE.MeshStandardMaterial({ color: S.mat3dBoxColor, emissive: new THREE.Color(S.mat3dBoxColor).multiplyScalar(S.mat3dBoxGlow ?? 0.45), roughness: S.mat3dBoxRough, side: THREE.DoubleSide }));
   const mi = mat(R, 'kraftIn', () => new THREE.MeshStandardMaterial({ color: new THREE.Color(S.mat3dBoxColor).multiplyScalar(0.62), roughness: 0.95, side: THREE.DoubleSide }));
   const grp = new THREE.Group(), u = new THREE.PlaneGeometry(1, 1), parts = {};
-  const wall = (name, mm) => { const me = new THREE.Mesh(u, mm); me.castShadow = true; me.receiveShadow = true; grp.add(me); parts[name] = me; return me; };
+  const wall = (name, mm) => { const me = new THREE.Mesh(u, mm); me.userData.part = name; me.castShadow = true; me.receiveShadow = true; grp.add(me); parts[name] = me; return me; };
   wall('bottom', mi); ['front', 'back', 'left', 'right'].forEach(n => wall(n, m));
-  ['L', 'R', 'B', 'F'].forEach(n => { const piv = new THREE.Group(), f = new THREE.Mesh(u, m); f.castShadow = true; piv.add(f); grp.add(piv); parts['flap' + n] = piv; parts['flapM' + n] = f; });
+  ['L', 'R', 'B', 'F'].forEach(n => { const piv = new THREE.Group(), f = new THREE.Mesh(u, m); piv.userData.part = 'flap' + n; f.castShadow = true; piv.add(f); grp.add(piv); parts['flap' + n] = piv; parts['flapM' + n] = f; });
   grp.userData = parts; return grp;
 }
 function layoutBox(box, W, D, H, thS, thF) {
@@ -174,7 +175,13 @@ const boxW = (S, w) => w * S.cellW * 0.98;
 export const IS3D = a => a === 'belt' || a === 'board' || /^(tile_|cup_|boxbody_|boxflap_|boxfront_)/.test(a);
 function render(R, items, S, w, h) {
   if (R.renderer.domElement.width !== w || R.renderer.domElement.height !== h) R.renderer.setSize(w, h, false);
-  R.renderer.shadowMap.enabled = !!S.shadow3d; R.hemi.intensity = S.light3dAmbient; R.sun.intensity = S.light3dSun; R.ground.material.opacity = S.shadow3dOpacity;
+  R.renderer.shadowMap.enabled = !!S.shadow3d;
+  apply(R, items, S);
+  R.renderer.render(R.scene, R.camera);
+  return R.canvas;
+}
+function apply(R, items, S) {
+  R.hemi.intensity = S.light3dAmbient; R.sun.intensity = S.light3dSun; R.ground.material.opacity = S.shadow3dOpacity;
   R.pool.forEach(o => o.used = false); const cupsBy = {};
   for (const it of items) {
     const a = it.asset; if (!IS3D(a) || a === 'belt' || a === 'board' || it.op <= 0.01) continue;
@@ -185,17 +192,15 @@ function render(R, items, S, w, h) {
       obj.userData.m.emissive.setRGB(0, 0, 0); R.pool.get(it.id).flash = 0;
     } else if (a.startsWith('cup_')) { // 杯子用 InstancedMesh（每色一批），数百个杯子也只有几次绘制调用
       const color = a.slice(4), wp = R.wpp(it.x, it.y + (it.lift || 0)), sc = S.cupSize * wp * it.sx * S.cup3dScale, onBelt = it.z < 3, hb = onBelt ? R.beltTopH * wp : (it.z >= 49 ? S.tile3dThick * S.cellW * wp * 0.6 : 0), { p, h } = R.place(it, hb);
-      M4.compose(V3.set(p.x, hb + h, p.z), Q0, SC.set(sc, sc * (it.sy / it.sx), sc));
-      (cupsBy[color] || (cupsBy[color] = [])).push(M4.clone());
+      if (R.exportMode) { const o = getObj(R, it.id, () => makeCup(R, S, color)); o.position.set(p.x, hb + h, p.z); o.scale.set(sc, sc * (it.sy / it.sx), sc); o.quaternion.identity(); }
+      else { M4.compose(V3.set(p.x, hb + h, p.z), Q0, SC.set(sc, sc * (it.sy / it.sx), sc)); (cupsBy[color] || (cupsBy[color] = [])).push(M4.clone()); }
     } else if (a.startsWith('boxbody_') && it.meta) {
       const m = it.meta, obj = getObj(R, it.id, () => makeBox(R, S)), thT = (S.tile3dThick + 0.03) * S.cellW * R.wpp(it.x, it.y + (it.lift || 0)) * (m.W / boxW(S, m.w)), { p, h, wp } = R.place(it, thT);
       const W = m.W * wp, D = m.D * wp, H = Math.max(1e-4, m.H * wp); obj.position.set(p.x, Math.max(0, h + thT * 0.9 - H), p.z); /* 参考：箱口 ≈ 升起的托盘顶面，箱体在其下方向下长出（悬空） */ layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1);
       obj.traverse(o => { if (o.material) { o.material.transparent = it.op < 1; o.material.opacity = it.op; } });
     }
   }
-  updateCups(R, S, cupsBy);
+  if (!R.exportMode) updateCups(R, S, cupsBy);
   R.pool.forEach((o, id) => { o.obj.visible = !!o.used; if (o.flash && o.obj.userData.m) o.obj.userData.m.emissive.setRGB(o.flash * 0.6, 0, 0); });
-  for (const [id, o] of R.pool) if (!o.used && R.pool.size > 600) { R.dyn.remove(o.obj); R.pool.delete(id); }
-  R.renderer.render(R.scene, R.camera);
-  return R.canvas;
+  if (!R.exportMode) for (const [id, o] of R.pool) if (!o.used && R.pool.size > 600) { R.dyn.remove(o.obj); R.pool.delete(id); }
 }

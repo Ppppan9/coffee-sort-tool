@@ -205,14 +205,12 @@ export function boxDims(S, w) { return { W: w * S.cellW * 0.98, D: S.cellH * 0.9
 const KR = { face: '#d9a466', side: '#c48b4e', in: '#8a5a2c', flapOut: '#e8b878', flapIn: '#b07a42', edge: '#a8723c' };
 // 箱体：箱口内部（暗）+ 正面；锚点 = 箱口中心
 export function boxBodySprite(S, w, k) {
-  const { W, D, H } = boxDims(S, w), pad = 4, c = mk((W + pad * 2) * k, (D + H + pad * 2) * k), g = c.getContext('2d');
+  const { W, D } = boxDims(S, w), pad = 4, c = mk((W + pad * 2) * k, (D + pad * 2) * k), g = c.getContext('2d'); // v1.2.1：只画箱口内部（正面由 boxFront 按真实箱深投影绘制，盖在箱内杯子之上）
   g.setTransform(k, 0, 0, k, pad * k, pad * k);
   g.fillStyle = KR.in; g.fillRect(0, 0, W, D); // 箱内
   const gi = g.createLinearGradient(0, 0, 0, D); gi.addColorStop(0, 'rgba(0,0,0,0.35)'); gi.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gi; g.fillRect(0, 0, W, D);
-  const gf = g.createLinearGradient(0, D, 0, D + H); gf.addColorStop(0, shade(KR.face, 0.08)); gf.addColorStop(1, shade(KR.face, -0.12)); g.fillStyle = gf; g.fillRect(0, D, W, H);
-  g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, D, W, 2); g.fillStyle = KR.edge; g.fillRect(0, D + H - 3, W, 3);
-  g.strokeStyle = 'rgba(120,70,30,0.35)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, W - 1, D + H - 1);
-  return { c, w: W + pad * 2, h: D + H + pad * 2, ax: W / 2 + pad, ay: D / 2 + pad };
+  g.strokeStyle = 'rgba(120,70,30,0.35)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, W - 1, D - 1);
+  return { c, w: W + pad * 2, h: D + pad * 2, ax: W / 2 + pad, ay: D / 2 + pad };
 }
 // 箱体正面（v1.2：纸箱从出口长出，正面纵向拉伸到出口）；锚点 = 上边中点
 export function boxFrontSprite(S, w, k) {

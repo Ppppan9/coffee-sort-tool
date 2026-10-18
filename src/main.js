@@ -179,17 +179,21 @@ function scene(t) {
     add('cup_' + c.q, 'cup_' + L.queue[c.q], ca.x, ca.y, { sx: ca.s, z: 50 + (Z - Wd.dock[1]) / 1e4, w: [X, Y, Z] });
   }
   // 纸箱：grow = 杯子随托盘升起、箱体从下长出（翻盖竖起张开）；close = 侧盖先合、前后盖后合（连续翻折）；fly = 合好的箱子飞向计数器
-  const { D: BD, H: BH } = boxDims(S, 1);
-  const boxAt = (j, bw, x, y, s, thSide, thFB, grow, op, z, wb) => {
-    const id = 'box_' + j.i, sx = dsx * s, sy = dsy * s, lf = dockXY[1] - y, add2 = (n, asset, dx, dy, o) => add(id + n, asset, x + dx * sx, y + dy * sy, { z: z + (o.dz || 0), op, sx: sx * (o.sx ?? 1), sy: sy * (o.sy ?? 1), lift: lf });
-    const W = boxDims(S, bw).W, D = BD;
-    add2('_body', `boxbody_${bw}`, 0, 0, { sy: 1, dz: 0 }); out[out.length - 1].meta = { w: bw, W: W * sx, D: D * sx, H: BH * sx * grow, grow, thS: thSide, thF: thFB, lift: lf, ph: j.ph, color: st.tiles[j.i].color, bsc: s, wx: wb[0], wy: wb[1], wz: wb[2] }; // wx/wy/wz：3D 纸箱底面中心（世界）
-    add2('_front', `boxfront_${bw}`, 0, D / 2, { sy: Math.max(0.01, grow), dz: 0.001 }); // 正面（随出现进度向下长出）
-    const fl = (th, kind, n, dx, dy, dir, dz) => { const c = Math.cos(th), f = c >= 0 ? 'out' : 'in', proj = c >= 0 ? c : c * (kind === 'fb' ? 1.7 : 1); add2(n, `boxflap_${kind}_${f}_${bw}`, dx, dy, kind === 'side' ? { sx: proj * dir, dz } : { sy: proj * dir, dz }); };
-    // 背盖、左右盖、前盖（合上时前盖最上层）
-    fl(thFB, 'fb', '_flapB', 0, -D / 2, 1, 0.003); fl(thFB, 'fb', '_flapF', 0, D / 2, -1, 0.004); // 参考：前后盖先合
-    fl(thSide, 'side', '_flapL', -W / 2, 0, 1, 0.005); fl(thSide, 'side', '_flapR', W / 2, 0, -1, 0.005); // 左右盖后合、盖在最上（中缝竖直）
+  // v1.2.1 纸箱 = 世界里的真实纸箱（3D 同一份尺寸），2D 精灵是它的投影：箱底 = 升起托盘底面下 1 单位，箱壁在托盘 / 杯子外侧，
+  // 箱口高度 H3 随“长出”逐渐加深（参考：先在托盘四周出现、再变深），在任何翻盖越过竖直向内翻之前箱口已高于杯口 → 翻盖 / 箱壁永不碰杯子与托盘
+  const boxAt = (j, bw, wb, s, H3, thSide, thFB, op, z) => {
+    const id = 'box_' + j.i, [bx, by, bz] = wb, { W3, D3 } = Wd.boxWD(bw, s), my = by + H3, { W, D, H } = boxDims(S, bw);
+    const c = Wd.proj(bx, my, bz), xl = Wd.proj(bx - W3 / 2, my, bz), xr = Wd.proj(bx + W3 / 2, my, bz), zf = Wd.proj(bx, my, bz + D3 / 2), zb = Wd.proj(bx, my, bz - D3 / 2), bot = Wd.proj(bx, by, bz + D3 / 2);
+    const sx = (xr[0] - xl[0]) / W, sy = (zf[1] - zb[1]) / D, x = c[0], y = c[1], lf = dockXY[1] - y;
+    const add2 = (n, asset, dx, dy, o) => add(id + n, asset, x + dx * sx, y + dy * sy, { z: z + (o.dz || 0), op, sx: sx * (o.sx ?? 1), sy: sy * (o.sy ?? 1), lift: lf });
+    add2('_body', `boxbody_${bw}`, 0, 0, { dz: 0 }); out[out.length - 1].meta = { w: bw, W: W * sx, D: D * sx, H: H3 / Wd.k0, grow: 1, thS: thSide, thF: thFB, lift: lf, ph: j.ph, color: st.tiles[j.i].color, bsc: s, wx: bx, wy: by, wz: bz, W3, D3, H3 }; // W3/D3/H3 + wx/wy/wz：3D 纸箱（世界）
+    add2('_front', `boxfront_${bw}`, 0, D / 2, { sy: Math.max(0.001, (bot[1] - zf[1]) / (H * sy)), dz: 0.0025 }); // 正面：箱口前沿 → 箱底（画在箱内杯子之上 = 遮住杯子下半）
+    const fl = (th, kind, n, dx, dy, dir, dz) => { const cc = Math.cos(th), f = cc >= 0 ? 'out' : 'in', proj = cc >= 0 ? cc : cc * (kind === 'fb' ? 1.7 : 1); add2(n, `boxflap_${kind}_${f}_${bw}`, dx, dy, kind === 'side' ? { sx: proj * dir, dz } : { sy: proj * dir, dz }); };
+    // 2D 层级 = 3D 遮挡：后盖 / 左右盖向外（θ>90°）时在杯子后面，向内翻过竖直后盖在杯子上面；前盖始终在前
+    fl(thFB, 'fb', '_flapB', 0, -D / 2, 1, thFB > Math.PI / 2 ? 0.0002 : 0.003); fl(thFB, 'fb', '_flapF', 0, D / 2, -1, 0.004); // 参考：前后盖先合
+    fl(thSide, 'side', '_flapL', -W / 2, 0, 1, thSide > Math.PI / 2 ? 0.0003 : 0.005); fl(thSide, 'side', '_flapR', W / 2, 0, -1, thSide > Math.PI / 2 ? 0.0003 : 0.005); // 左右盖后合、盖在最上（中缝竖直）
   };
+  const boxDepth = (dq, pb = 1) => Math.max(1e-3, pb * (Wd.tileTh + 2 + (Wd.boxInnerH - Wd.tileTh - 2) * easeIO(dq))); // 箱口加深：dq 0→1
   // v1.2 纸箱时序（按参考 5.47–6.85 s 逐帧对比）：grow = 托盘连同杯子升起（前 42%）→ 箱体出现、四片翻盖从竖直翻到完全摊平并放大到 boxScale（后段）；
   // close = 前后盖先合（0–66%），左右盖后合（29–100%，最后盖在最上，中缝竖直）+ 轻微回弹；fly = 合好的箱子向右飞出画面（经过计数器后方）
   const PI = Math.PI;
@@ -200,12 +204,12 @@ function scene(t) {
       // 参考：5.47→5.90 s 托盘+杯子升起（ease-out，悬空）；5.80 s 纸箱从出口长出（正面一直到出口）；5.80→6.03 s 放大 + 翻盖摊平；6.03→6.10 停顿
       const p = clamp01((t - j.t1) / S.boxGrow), pl = 1 - Math.pow(1 - clamp01(p / 0.65), 4), pb = clamp01((p - 0.55) / 0.06), po = easeIO((p - 0.55) / 0.38);
       liftTo(pl * S.boxLift); bsc = 1 + (S.boxScale - 1) * po;
-      if (pb > 0) boxAt(j, bw, top2[0], top2[1], bsc, PI * 0.72 + PI * 0.28 * po, PI * 0.72 + PI * 0.28 * po, pb, 1, z, [Wd.dock[0], Wd.FY + hL - 1, Wd.dock[1]]);
+      if (pb > 0) boxAt(j, bw, [Wd.dock[0], Wd.FY + hL - 1, Wd.dock[1]], bsc, boxDepth(0.6 * clamp01((p - 0.55) / 0.45), pb), PI * 0.72 + PI * 0.28 * po, PI * 0.72 + PI * 0.28 * po, 1, z);
     }
     if (j.ph === 'close') {
       const p = clamp01((t - j.t1) / S.boxClose); liftTo(S.boxLift); bsc = S.boxScale;
       const pf = easeIO(p / 0.66), ps = easeIO((p - 0.29) / 0.71), bump = 1 + 0.05 * Math.sin(PI * clamp01((p - 0.86) / 0.14));
-      boxAt(j, bw, top2[0], top2[1], bsc * bump, PI * (1 - ps), PI * (1 - pf), 1, 1, z, [Wd.dock[0], Wd.FY + hL - 1, Wd.dock[1]]);
+      boxAt(j, bw, [Wd.dock[0], Wd.FY + hL - 1, Wd.dock[1]], bsc * bump, boxDepth(0.6 + 0.4 * clamp01(p / 0.3)), PI * (1 - ps), PI * (1 - pf), 1, z); // 箱口在前后盖越过竖直（p≈0.33）前已加深到杯口之上
     }
     bsc = 1; // 参考：托盘与杯子升起时不放大，纸箱在其外围放大
     if (j.ph === 'grow' || j.ph === 'close') { // 托盘随杯子一起升起（在箱内）
@@ -217,9 +221,9 @@ function scene(t) {
   for (const j of jobs) {
     if (j.ph !== 'fly') continue; const bw = st.tiles[j.i].w;
     const p = clamp01((t - j.t1) / S.boxFlyDur), hL = S.boxLift * Wd.liftPerPx, a0 = tileAt(Wd.dock[0], Wd.FY + hL, Wd.dock[1]), x0 = a0.x, y0 = a0.y;
-    const wb = (x, y) => { const g = Wd.un(x, y, Wd.FY + hL + Wd.tileTh); return [g.x, Wd.FY + hL - 1, g.z]; }; // 3D 纸箱沿 2D 轨迹的世界位置（同一高度平面）
-    if (S.boxFlyTo === 'counter') { const e = easeIO(p), x1 = S.counterX + 113, y1 = S.counterY + 30, x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e - Math.sin(PI * e) * 70; boxAt(j, bw, x, y, S.boxScale * (1 - 0.45 * e), 0, 0, 1, p > 0.75 ? (1 - p) * 4 : 1, 60, wb(x, y)); }
-    else { const e = Math.pow(p, 1.5), x = x0 + (DW + 160 - x0) * e, y = y0 - 18 * Math.sin(PI * p * 0.5); boxAt(j, bw, x, y, S.boxScale, 0, 0, 1, 1, 60, wb(x, y)); }
+    const wb = (x, y) => { const g = Wd.un(x, y, Wd.FY + hL + Wd.tileTh); return [g.x, Wd.FY + hL - 1 + (y0 - y) * Wd.liftPerPx * 0.5, g.z]; }; // 3D 纸箱沿 2D 轨迹的世界位置（同一高度平面）
+    if (S.boxFlyTo === 'counter') { const e = easeIO(p), x1 = S.counterX + 113, y1 = S.counterY + 30, x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e - Math.sin(PI * e) * 70; boxAt(j, bw, wb(x, y), S.boxScale * (1 - 0.45 * e), Wd.boxInnerH, 0, 0, p > 0.75 ? (1 - p) * 4 : 1, 60); }
+    else { const e = Math.pow(p, 1.5), x = x0 + (DW + 160 - x0) * e, y = y0 - 18 * Math.sin(PI * p * 0.5); boxAt(j, bw, wb(x, y), S.boxScale, Wd.boxInnerH, 0, 0, 1, 60); }
   }
   // Nice 闪光粒子：中心白色光晕 + 金色星星向外飞散（参考 6.5–7.1 s）
   vis.nices.forEach(n => { const p = (t - n.t0) / Math.max(1, S.niceDur), nx = S.niceX, ny = S.niceY; if (p >= 1 || !S.sparkCount) return;

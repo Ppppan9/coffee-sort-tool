@@ -1,6 +1,6 @@
 {
   "name": "coffee-sort-tool",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "咖啡分拣核玩工具（单文件离线版）",
   "type": "module",
   "scripts": {
@@ -12,7 +12,9 @@
     "test:shape": "node test/shape-test.mjs",
     "test:norec": "node test/no-autorec.mjs",
     "test:drag": "node test/drag-test.mjs",
-    "test:ae3d": "R3D=1 AE_OUT=/tmp/coffee_ae3d AE_ZIP=/workspace/coffee_ae3d_sample.zip node test/ae-export.mjs && node test/ae-mock.mjs /workspace/coffee_ae3d_sample.zip && CHECK_OUT=screenshots/ae_export_check_3d.jpg node test/ae-composite.mjs /workspace/coffee_ae3d_sample.zip /tmp/coffee_ae3d/snaps"
+    "test:ae3d": "R3D=1 AE_OUT=/tmp/coffee_ae3d AE_ZIP=/workspace/coffee_ae3d_sample.zip node test/ae-export.mjs && node test/ae-mock.mjs /workspace/coffee_ae3d_sample.zip && CHECK_OUT=screenshots/ae_export_check_3d.jpg node test/ae-composite.mjs /workspace/coffee_ae3d_sample.zip /tmp/coffee_ae3d/snaps",
+    "test:clip": "node test/clip-test.mjs",
+    "test:fill": "node test/cup-fill.mjs"
   },
   "repository": {
     "type": "git",

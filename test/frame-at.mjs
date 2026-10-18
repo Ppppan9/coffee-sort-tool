@@ -6,11 +6,16 @@ const CROP = (process.env.CROP || '230,420,250,280').split(',').map(Number);
 const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await b.newPage({ viewport: { width: 1400, height: 1000 } }); const errs = [];
 p.on('pageerror', e => errs.push(String(e))); p.on('console', m => m.type() === 'error' && errs.push(m.text()));
-await p.goto('file://' + (html.startsWith('/') ? html : process.cwd() + '/' + html)); await p.waitForTimeout(600);
+await p.goto('file://' + (html.startsWith('/') ? html : process.cwd() + '/' + html)); await p.waitForTimeout(600); if (process.env.COLOR) await p.evaluate(c => window.__COLOR = c, process.env.COLOR);
 const url = await p.evaluate(([r3, got, ph, C]) => {
   __game.set('render3d', false); __game.set('level', 'reference'); __game.set('handShow', false);
   let t = 1e6; __game.renderAt(t); __game.newGame(); __game.renderAt(t);
-  const i = __game.st.tiles.findIndex((_, k) => __game.canSend(k).ok); __game.tapTile(i);
+  const want = window.__COLOR || null; let i = -1;
+  for (let guard = 0; guard < 40; guard++) { // 依次送出可送托盘，直到出口上是指定颜色的托盘（用户截图：奶油色托盘）
+    i = __game.st.tiles.findIndex((_, k) => __game.canSend(k).ok); if (i < 0) break; const col = __game.st.tiles[i].color; __game.tapTile(i);
+    if (!want || col === want) break;
+    let m = 0; while (m++ < 2000) { t += 1000 / 60; __game.renderAt(t); if (!__game.jobs.length) break; }
+  }
   const S = __game.S; let n = 0, tg = null;
   while (n++ < 4000) { t += 1000 / 120; __game.renderAt(t); const j = __game.jobs.find(q => q.i === i); if (j && j.ph === 'fill' && j.got >= got && tg == null) tg = t + ph * S.cupFly; if (tg != null && t >= tg) break; }
   if (r3) __game.set('render3d', true); __game.renderAt(t);

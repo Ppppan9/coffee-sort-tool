@@ -85,6 +85,7 @@ window.__clipInit = function () {
       if (still && a.y0 < 5 && !(ctx.dragging === a.id) && !(ctx.shaking || []).includes(a.id)) { let e = 1e9; for (const [gx, gz] of goodCentres) e = Math.min(e, Math.hypot(a.px - gx, a.pz - gz)); A2('tray-cell centre', e, 0.5, { t: ctx.t, a: a.id }); A2('tray-floor height', Math.abs(a.y0 - floorY), 0.5, { t: ctx.t, a: a.id }); }
     }
     // ---- 纸箱：箱壁 / 箱底 / 翻盖 vs 箱内托盘与杯子 ----
+    st._boxes = [];
     for (const [id, o] of R.pool) { if (!o.used || !/^box_\d+_body$/.test(id)) continue; const box = o.obj, p = box.userData, W = p.front.scale.x, D = p.left.scale.x, H = p.front.scale.y, bx = box.position.x, by = box.position.y, bz = box.position.z;
       box.updateMatrixWorld(true);
       const inside = (x, z, r) => Math.abs(x - bx) + r <= W / 2 + 1e-3 && Math.abs(z - bz) + r <= D / 2 + 1e-3;
@@ -93,6 +94,21 @@ window.__clipInit = function () {
         if (c.y < by + H && c.top > by) { const r = cupR(c.k, Math.min(by + H, c.top) - c.y), pen = Math.max(Math.abs(c.x - bx) + r - W / 2, Math.abs(c.z - bz) + r - D / 2); const outside = Math.abs(c.x - bx) - r >= W / 2 || Math.abs(c.z - bz) - r >= D / 2; if (pen > 0 && !outside) P('box-cup', pen, { t: ctx.t, part: 'wall', c: [c.x, c.y, c.z].map(v => +v.toFixed(1)) }); if (c.y < by - 1e-3 && inside(c.x, c.z, cupR(c.k, 0))) P('box-cup', by - c.y, { t: ctx.t, part: 'bottom' }); }
         // 翻盖：采样翻盖矩形上的点，落在杯体内即穿模
         for (const n of ['L', 'R', 'B', 'F']) { const f = p['flapM' + n]; f.updateMatrixWorld(true); for (let u = 0; u <= 6; u++) for (let v = 0; v <= 6; v++) { const pt = f.localToWorld(new (box.position.constructor)(u / 6 - 0.5, v / 6 - 0.5, 0)); if (pt.y < c.y || pt.y > c.top) continue; const r = cupR(c.k, pt.y - c.y), d = Math.hypot(pt.x - c.x, pt.z - c.z); if (d < r) P('box-cup', Math.min(r - d, c.top - pt.y), { t: ctx.t, part: 'flap' + n }); } } }
+      // 翻盖 = 薄板：采样点 vs 托盘体 / 传送带体；箱底 / 箱壁 vs 传送带；（杯子见上）
+      const flapPts = []; for (const n of ['L', 'R', 'B', 'F']) { const f = p['flapM' + n]; for (let u = 0; u <= 8; u++) for (let v = 0; v <= 8; v++) flapPts.push([n, f.localToWorld(new (box.position.constructor)(u / 8 - 0.5, v / 8 - 0.5, 0))]); }
+      for (const t of tiles) for (const [n, pt] of flapPts) { if (Math.abs(pt.x - t.x) < t.hx && Math.abs(pt.z - t.z) < t.hz && pt.y > t.y0 && pt.y < t.y1) P('box-tray', Math.min(t.hx - Math.abs(pt.x - t.x), t.hz - Math.abs(pt.z - t.z), t.y1 - pt.y, pt.y - t.y0), { t: ctx.t, part: 'flap' + n, a: t.id }); }
+      for (const [n, pt] of flapPts) { const q = beltQ(pt.x, pt.z); if (q && q.e <= 0 && q.d < q.f.hw && pt.y < (q.d > q.f.inner ? q.f.rail : q.f.top)) P('box-belt', (q.d > q.f.inner ? q.f.rail : q.f.top) - pt.y, { t: ctx.t, part: 'flap' + n }); }
+      for (let u = 0; u <= 8; u++) for (let v = 0; v <= 8; v++) { const x = bx + (u / 8 - 0.5) * W, z = bz + (v / 8 - 0.5) * D, q = beltQ(x, z); if (q && q.e <= 0 && q.d < q.f.hw && by < q.f.rail) P('box-belt', q.f.rail - by, { t: ctx.t, part: 'body' }); }
+      // 纸箱–纸箱
+      const bb = { x0: bx - W / 2, x1: bx + W / 2, z0: bz - D / 2, z1: bz + D / 2, y0: by, y1: by + H }; for (const [, pt] of flapPts) { bb.x0 = Math.min(bb.x0, pt.x); bb.x1 = Math.max(bb.x1, pt.x); bb.z0 = Math.min(bb.z0, pt.z); bb.z1 = Math.max(bb.z1, pt.z); bb.y1 = Math.max(bb.y1, pt.y); }
+      for (const o2 of (st._boxes || [])) { const pen = Math.min(Math.min(bb.x1, o2.x1) - Math.max(bb.x0, o2.x0), Math.min(bb.z1, o2.z1) - Math.max(bb.z0, o2.z0), Math.min(bb.y1, o2.y1) - Math.max(bb.y0, o2.y0)); if (pen > 0) P('box-box', pen, { t: ctx.t }); } (st._boxes || (st._boxes = [])).push(bb);
+      // 2D：纸箱精灵锚点 = 3D 箱口中心投影；2D 层级 = 3D 遮挡（后盖 / 左右盖向外时在杯子后面，正面 / 前盖在杯子前面）
+      const bid = id.replace(/_body$/, ''), bi = items.findIndex(it => it.id === id), bit = items[bi];
+      if (bit) { const [x, y] = project(bx, by + H, bz); A2('2D↔3D box anchor (px)', Math.hypot(x - bit.x, y - bit.y), 1, { t: ctx.t, id }); const m = bit.meta || {};
+        const cupIdx = items.map((it, k) => [it, k]).filter(([it]) => /^cup_\d+$/.test(it.id) && it.lift > 0).map(a => a[1]);
+        if (cupIdx.length) { const lo = Math.min(...cupIdx), hi = Math.max(...cupIdx), ix = n => items.findIndex(it => it.id === bid + n), bad = [];
+          if (m.thF > Math.PI / 2 + 1e-3 ? ix('_flapB') > lo : ix('_flapB') < hi) bad.push('flapB'); for (const n of ['_flapL', '_flapR']) if (m.thS > Math.PI / 2 + 1e-3 ? ix(n) > lo : ix(n) < hi) bad.push(n); if (ix('_front') >= 0 && ix('_front') < hi) bad.push('front'); if (ix('_flapF') < hi) bad.push('flapF');
+          A2('2D box layering vs cups', bad.length, 0.5, { t: ctx.t, bad }); } }
       for (const t of tiles) { if (Math.abs(t.x - bx) > W / 2 + t.hx || Math.abs(t.z - bz) > D / 2 + t.hz || t.y1 < by || t.y0 > by + H) continue; const pen = Math.max(Math.abs(t.x - bx) + t.hx - W / 2, Math.abs(t.z - bz) + t.hz - D / 2); const outside = Math.abs(t.x - bx) - t.hx >= W / 2 || Math.abs(t.z - bz) - t.hz >= D / 2; if (pen > 0 && !outside) P('box-tray', pen, { t: ctx.t, a: t.id }); if (t.y0 < by - 1e-3 && !outside) P('box-tray', by - t.y0, { t: ctx.t, part: 'bottom', a: t.id }); }
     }
     // ---- 2D 一致性：2D 精灵锚点 = 3D 物体锚点的投影（托盘顶面中心 / 杯底中心）----

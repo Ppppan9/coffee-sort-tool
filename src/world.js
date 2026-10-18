@@ -53,6 +53,7 @@ export function createWorld(S, L) {
   // 纸箱升起：屏幕升起 boxLift(px) 对应的世界高度（出口处竖直方向 px/世界单位）
   { const a0 = proj(W.dock[0], W.FY, W.dock[1]), a1 = proj(W.dock[0], W.FY + 100, W.dock[1]); W.liftPerPx = 100 / (a0[1] - a1[1]); }
   W.boxInnerH = W.cupRest + W.cupTop + 4; // 纸箱：底面 = 托盘底面，箱口高于杯口
+  W.boxWD = (w, bsc) => ({ W3: Math.max(0.98 * w * C * bsc, 2 * W.tileHalfX(w) + 3), D3: Math.max(0.98 * CZ * bsc, 2 * W.tileHalfZ() + 3) }); // 纸箱口宽 / 深：至少比托盘外形大 1.5 单位/侧
   return W;
 }
 // 传送带世界折线：屏幕折线按带面高度反投影（与 scene3d 扫掠网格同一条中心线）

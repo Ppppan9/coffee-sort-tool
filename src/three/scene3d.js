@@ -201,7 +201,7 @@ function apply(R, items, S) {
     } else if (a.startsWith('boxbody_') && it.meta) {
       const m = it.meta, obj = getObj(R, it.id, () => makeBox(R, S)), thT = (S.tile3dThick + 0.03) * S.cellW * R.wpp(it.x, it.y + (it.lift || 0)) * (m.W / boxW(S, m.w)), { p, h, wp } = R.place(it, thT);
       if (m.wx != null) { // v1.2.1：世界纸箱——底面 = 升起托盘底面下方，箱壁在托盘 / 杯子外侧（留间隙），箱口高于杯口，向上长出；翻盖铰链在箱口 → 任何角度都不碰杯子
-        const Wn = R.W, bs = m.bsc || 1, W = Math.max(0.98 * m.w * Wn.C * bs, 2 * Wn.tileHalfX(m.w) + 3), D = Math.max(0.98 * Wn.CZ * bs, 2 * Wn.tileHalfZ() + 3), H = Math.max(1e-4, Wn.boxInnerH * m.grow);
+        const Wn = R.W, bs = m.bsc || 1, wd = Wn.boxWD(m.w, bs), W = m.W3 ?? wd.W3, D = m.D3 ?? wd.D3, H = Math.max(1e-4, m.H3 ?? Wn.boxInnerH * m.grow);
         obj.position.set(m.wx, m.wy, m.wz); layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1);
       } else { const W = m.W * wp, D = m.D * wp, H = Math.max(1e-4, m.H * wp); obj.position.set(p.x, Math.max(0, h + thT * 0.9 - H), p.z); layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1); }
       obj.traverse(o => { if (o.material) { o.material.transparent = it.op < 1; o.material.opacity = it.op; } });

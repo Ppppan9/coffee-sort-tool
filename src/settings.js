@@ -1,6 +1,6 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
 import { DEFAULT_HAND } from './default_hand.js';
-export const SETTINGS_VERSION = 5;
+export const SETTINGS_VERSION = 6;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -29,7 +29,7 @@ export const GROUPS = [
     ['shapeTint', '托盘颜色', 'select', 'palette', [['palette', '棕/奶油/绿（设置色）'], ['image', '按图片颜色就近匹配三色']]],
   ]],
   ['外观', [
-    ['bgColor', '沙地底色', 'color', '#e1c590'],
+    ['bgColor', '沙地底色', 'color', '#e3c794'],
     ['bgDark', '沙粒暗色', 'color', '#a1834f'],
     ['bgLight', '沙粒亮色', 'color', '#fff0c4'],
     ['bgGrain', '沙粒密度', 'range', 0.55, 0, 1, 0.01],
@@ -38,33 +38,35 @@ export const GROUPS = [
     ['cellH', '格高(顶行，px)', 'range', 62, 30, 120, 1],
     ['persp', '透视强度(远小近大)', 'range', 0.021, 0, 0.06, 0.001],
     ['boardOffX', '棋盘偏移X', 'range', 0, -200, 200, 1],
-    ['frameColor', '托盘框颜色', 'color', '#4a6aa8'],
+    ['frameColor', '托盘框颜色', 'color', '#5e7ebe'],
     ['frameLight', '托盘框亮边', 'color', '#7f9ad0'],
-    ['floorColor', '托盘底板(空格)颜色', 'color', '#aec6e9'],
+    ['floorColor', '托盘底板(空格)颜色', 'color', '#a9bfe0'],
     ['frameW', '托盘框宽度(px)', 'range', 16, 0, 40, 1],
-    ['colBrown', '棕色托盘', 'color', '#7e533b'],
-    ['colCream', '奶油色托盘', 'color', '#f7e9b3'],
-    ['colGreen', '绿色托盘', 'color', '#c1f113'],
+    ['colBrown', '棕色托盘', 'color', '#83502b'],
+    ['colCream', '奶油色托盘', 'color', '#f4e3b3'],
+    ['colGreen', '绿色托盘', 'color', '#b9ee00'],
     ['tileGap', '托盘间缝(px)', 'range', 4, 0, 12, 0.5],
     ['tileRadius', '托盘圆角(px)', 'range', 9, 0, 30, 1],
     ['tileThick', '托盘厚度(px)', 'range', 6, 0, 16, 0.5],
     ['bowlSize', '凹槽直径(×半格)', 'range', 0.86, 0.4, 0.95, 0.01],
     ['bowlDepth', '凹槽深浅(明暗)', 'range', 0.8, 0, 1, 0.01],
-    ['cupBrown', '咖啡杯：棕杯身', 'color', '#453027'],
+    ['cupBrown', '咖啡杯：棕杯身', 'color', '#7a4a35'],
     ['cupBrownLiq', '咖啡杯：棕液面', 'color', '#8a6250'],
-    ['cupCream', '咖啡杯：奶油杯身', 'color', '#f1e3b4'],
+    ['cupCream', '咖啡杯：奶油杯身', 'color', '#e0d6a6'],
     ['cupCreamLiq', '咖啡杯：奶油液面', 'color', '#fff6d6'],
-    ['cupGreen', '咖啡杯：绿杯身', 'color', '#8cc400'],
+    ['cupGreen', '咖啡杯：绿杯身', 'color', '#86c000'],
     ['cupGreenLiq', '咖啡杯：绿液面', 'color', '#d4f36a'],
     ['cupSize', '咖啡杯大小(近处宽 px)', 'range', 34, 16, 60, 1],
-    ['beltTop', '传送带顶面色', 'color', '#93a9d6'],
-    ['beltSide', '传送带侧面色', 'color', '#34497e'],
-    ['beltRail', '传送带挡边顶色(3D)', 'color', '#9fb8e8'],
+    ['beltTop', '传送带顶面色', 'color', '#94add4'],
+    ['beltSide', '传送带侧面色', 'color', '#6f8fd8'],
+    ['beltRail', '传送带挡边顶色(3D)', 'color', '#a0bce6'],
     ['beltW', '传送带宽度(px)', 'range', 54, 20, 80, 1],
     ['cupGap', '杯子间距(近处 px)', 'range', 42, 20, 70, 1],
     ['counterShow', '显示杯数计数器', 'bool', true],
     ['counterStart', '计数器初始值', 'range', 999, 0, 9999, 1],
     ['counterLabel', '计数器文字', 'text', '咖啡杯数'],
+    ['counterBg', '计数器底色(参考≈#4f514d)', 'color', '#4f514d'],
+    ['counterBgAlpha', '计数器底色不透明度', 'range', 0.94, 0, 1, 0.01],
     ['counterX', '计数器 X', 'range', 412, 0, 600, 1],
     ['counterY', '计数器 Y', 'range', 440, 0, 1200, 1],
     ['niceText', '完成提示文字', 'text', 'Nice'],
@@ -73,23 +75,26 @@ export const GROUPS = [
   ['3D 渲染（three.js，离线打包）', [
     ['render3d', '页面使用 3D 渲染（关闭则为 2D 精灵绘制）', 'bool', true],
     ['cam3dFov', '相机视角 FOV(°)', 'range', 30, 10, 70, 0.5],
-    ['cam3dPitch', '相机俯角(°，参考≈41)', 'range', 41, 15, 89, 0.5],
+    ['cam3dPitch', '相机俯角(°，按参考棋盘格拟合≈51)', 'range', 51, 15, 89, 0.5],
     ['cam3dDist', '相机距离', 'range', 2400, 500, 8000, 10],
     ['light3dSun', '主光强度', 'range', 2.2, 0, 6, 0.05],
     ['light3dAmbient', '环境光强度', 'range', 1.1, 0, 4, 0.05],
     ['light3dAzim', '主光方位角(°)', 'range', 200, 0, 360, 1],
-    ['light3dElev', '主光仰角(°)', 'range', 55, 5, 90, 1],
+    ['light3dElev', '主光仰角(°)', 'range', 80, 5, 90, 1],
     ['shadow3d', '投射阴影', 'bool', true],
-    ['shadow3dOpacity', '阴影浓度', 'range', 0.28, 0, 1, 0.01],
+    ['shadow3dOpacity', '阴影浓度', 'range', 0.12, 0, 1, 0.01],
     ['mat3dTileRough', '材质：硅胶托盘粗糙度', 'range', 0.55, 0, 1, 0.01],
-    ['mat3dTileClearcoat', '材质：硅胶托盘清漆光泽', 'range', 0.35, 0, 1, 0.01],
+    ['mat3dTileClearcoat', '材质：硅胶托盘清漆光泽', 'range', 0.15, 0, 1, 0.01],
     ['tile3dThick', '托盘厚度(格)', 'range', 0.14, 0.04, 0.4, 0.01],
+    ['mat3dSpecular', '材质：托盘高光强度(参考偏哑光)', 'range', 0.3, 0, 1, 0.01],
     ['mat3dCupRough', '材质：纸杯粗糙度', 'range', 0.75, 0, 1, 0.01],
     ['cup3dScale', '3D 杯子尺寸修正', 'range', 1, 0.5, 1.6, 0.01],
+    ['cup3dHeight', '3D 杯子高度(×杯口直径，参考≈1.7)', 'range', 1.7, 0.6, 2.5, 0.01],
+    ['cup3dBottom', '3D 杯底半径(×杯口直径)', 'range', 0.33, 0.15, 0.5, 0.01],
     ['mat3dBoxColor', '材质：纸箱颜色', 'color', '#d9a466'],
     ['mat3dBoxRough', '材质：纸箱粗糙度', 'range', 0.9, 0, 1, 0.01],
     ['mat3dBeltRough', '材质：传送带粗糙度', 'range', 0.6, 0, 1, 0.01],
-    ['belt3dHeight', '传送带高度(px)', 'range', 10, 0, 40, 0.5],
+    ['belt3dHeight', '传送带高度(px)', 'range', 30, 0, 40, 0.5],
     ['belt3dRail', '传送带挡边高度(px)', 'range', 6, 0, 30, 0.5],
     ['frame3dHeight', '棋盘外框高度(px)', 'range', 14, 0, 40, 0.5],
   ]],
@@ -200,7 +205,7 @@ export function migrate(obj) {
     mv('handImg', 'handImage'); mv('sfxVol', 'sfxVolume'); mv('sfx', 'sfxMute', x => !x); mv('recTail', 'tailSec', x => Math.round(x / 100) / 10); mv('endText', 'endTitle');
     v = 1;
   }
-  const OLD = { 5: { handSize: 0.34, handAnchorX: 0.05, handAnchorY: 0.05, handImage: '' }, 4: { handSize: 0.42 }, 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
+  const OLD = { 6: { cam3dPitch: 41, belt3dHeight: 10, light3dElev: 55, shadow3dOpacity: 0.28, mat3dTileClearcoat: 0.35, floorColor: '#aec6e9', frameColor: '#4a6aa8', colBrown: '#7e533b', colCream: '#f7e9b3', colGreen: '#c1f113', bgColor: '#e1c590', beltRail: '#9fb8e8', beltTop: '#93a9d6', beltSide: '#34497e', cupBrown: '#453027', cupCream: '#f1e3b4', cupGreen: '#8cc400' }, 5: { handSize: 0.34, handAnchorX: 0.05, handAnchorY: 0.05, handImage: '' }, 4: { handSize: 0.42 }, 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
   for (const nv of Object.keys(OLD).map(Number).sort()) if (v < nv) { for (const k in OLD[nv]) if (s[k] === OLD[nv][k]) delete s[k]; v = nv; }
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];

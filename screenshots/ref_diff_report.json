@@ -1,0 +1,331 @@
+{
+ "colors": {
+  "sand": {
+   "ref": [
+    227,
+    199,
+    148
+   ],
+   "tool": [
+    227,
+    199,
+    148
+   ],
+   "dRGB": 0
+  },
+  "floor": {
+   "ref": [
+    177,
+    198,
+    231
+   ],
+   "tool": [
+    177,
+    198,
+    231
+   ],
+   "dRGB": 0
+  },
+  "frame": {
+   "ref": [
+    107,
+    136,
+    198
+   ],
+   "tool": [
+    107,
+    136,
+    198
+   ],
+   "dRGB": 0
+  },
+  "tile_brown": {
+   "ref": [
+    139,
+    93,
+    68
+   ],
+   "tool": [
+    139,
+    91,
+    61
+   ],
+   "dRGB": 7.3
+  },
+  "tile_cream": {
+   "ref": [
+    250,
+    233,
+    186
+   ],
+   "tool": [
+    250,
+    233,
+    186
+   ],
+   "dRGB": 0
+  },
+  "tile_green": {
+   "ref": [
+    192,
+    244,
+    17
+   ],
+   "tool": [
+    191.5,
+    244,
+    40
+   ],
+   "dRGB": 23
+  },
+  "bowl_brown": {
+   "ref": [
+    118,
+    73,
+    46
+   ],
+   "tool": [
+    127,
+    82,
+    54
+   ],
+   "dRGB": 15
+  },
+  "bowl_cream": {
+   "ref": [
+    246,
+    228,
+    173
+   ],
+   "tool": [
+    230,
+    214,
+    170
+   ],
+   "dRGB": 21.5
+  },
+  "counter_bg": {
+   "ref": [
+    79,
+    81,
+    77
+   ],
+   "tool": [
+    87,
+    88,
+    81
+   ],
+   "dRGB": 11.4
+  },
+  "belt_light": {
+   "ref": [
+    157,
+    181,
+    220
+   ],
+   "tool": [
+    156,
+    180,
+    218
+   ],
+   "dRGB": 2.4
+  },
+  "belt_dark": {
+   "ref": [
+    56,
+    77,
+    119
+   ],
+   "tool": [
+    49,
+    63,
+    95
+   ],
+   "dRGB": 28.7
+  },
+  "belt_mid": {
+   "ref": [
+    106,
+    131,
+    172
+   ],
+   "tool": [
+    54,
+    68,
+    102
+   ],
+   "dRGB": 107.6
+  },
+  "cup_brown": {
+   "ref": [
+    78,
+    52,
+    39
+   ],
+   "tool": [
+    113,
+    103,
+    74
+   ],
+   "dRGB": 71.1
+  },
+  "cup_cream": {
+   "ref": [
+    211,
+    192,
+    137
+   ],
+   "tool": [
+    224,
+    197,
+    146
+   ],
+   "dRGB": 16.6
+  },
+  "cup_green": {
+   "ref": [
+    135,
+    183,
+    3
+   ],
+   "tool": [
+    65,
+    92,
+    0
+   ],
+   "dRGB": 114.8
+  }
+ },
+ "positions": {
+  "board_top_y@x100": {
+   "ref": 612,
+   "tool": 616,
+   "d": 4
+  },
+  "board_top_y@x620": {
+   "ref": 612,
+   "tool": 616,
+   "d": 4
+  },
+  "board_left_x@y700": {
+   "ref": 26,
+   "tool": 16,
+   "d": -10
+  },
+  "board_right_x@y700": {
+   "ref": 699,
+   "tool": 703,
+   "d": 4
+  },
+  "board_left_x@y900": {
+   "ref": 0,
+   "tool": 0,
+   "d": 0
+  },
+  "board_right_x@y900": {
+   "ref": 719,
+   "tool": 719,
+   "d": 0
+  },
+  "board_left_x@y1100": {
+   "ref": null,
+   "tool": null,
+   "d": null
+  },
+  "board_right_x@y1100": {
+   "ref": null,
+   "tool": null,
+   "d": null
+  },
+  "belt_side_y@x150": {
+   "ref": [
+    36,
+    94,
+    156,
+    223,
+    257,
+    298,
+    378,
+    416,
+    426,
+    466,
+    509,
+    564
+   ],
+   "tool": [
+    89,
+    153,
+    210,
+    228,
+    292,
+    374,
+    462,
+    558
+   ]
+  },
+  "belt_side_y@x250": {
+   "ref": [
+    36,
+    94,
+    156,
+    224,
+    298,
+    378,
+    466,
+    564
+   ],
+   "tool": [
+    90,
+    156,
+    175,
+    221,
+    293,
+    376,
+    460,
+    557
+   ]
+  },
+  "exit_belt_x@y600": {
+   "ref": 362,
+   "tool": 360,
+   "d": -2
+  },
+  "counter_left_x@y500": {
+   "ref": 414,
+   "tool": 415,
+   "d": 1
+  },
+  "counter_top_y@x520": {
+   "ref": null,
+   "tool": 442,
+   "d": null
+  }
+ },
+ "meanAbsDiff": {
+  "board(628-1240)": 33.9,
+  "belt(0-620)": 60.2,
+  "counter": 43.8,
+  "all": 47.9
+ },
+ "settings": {
+  "floorColor": "#a9bfe0",
+  "frameColor": "#5e7ebe",
+  "colBrown": "#83502b",
+  "colCream": "#f4e3b3",
+  "colGreen": "#b9ee00",
+  "beltRail": "#a0bce6",
+  "beltTop": "#94add4",
+  "beltSide": "#6f8fd8",
+  "cupBrown": "#7a4a35",
+  "cupCream": "#e0d6a6",
+  "cupGreen": "#86c000",
+  "bgColor": "#e3c794",
+  "cam3dFov": 30,
+  "cam3dPitch": 51,
+  "cam3dDist": 2400,
+  "belt3dHeight": 30,
+  "cup3dHeight": 1.7,
+  "light3dElev": 80,
+  "shadow3dOpacity": 0.12
+ }
+}

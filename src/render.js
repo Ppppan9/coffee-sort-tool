@@ -120,7 +120,7 @@ export function boxSprite(S, w, k, closed) {
 // ---------- 计数器 ----------
 export function counterSprite(S, n, k) {
   const W = 226, H = 108, c = mk(W * k, H * k), g = c.getContext('2d'); g.setTransform(k, 0, 0, k, 0, 0);
-  g.fillStyle = 'rgba(40,40,40,0.92)'; rr(g, 0, 0, W, H, 8); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 2; rr(g, 1, 1, W - 2, H - 2, 7); g.stroke();
+  g.fillStyle = S.counterBg || '#282828'; g.globalAlpha = S.counterBgAlpha ?? 0.92; rr(g, 0, 0, W, H, 8); g.fill(); g.globalAlpha = 1; g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 2; rr(g, 1, 1, W - 2, H - 2, 7); g.stroke();
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
   g.font = 'bold 44px Arial,"Microsoft YaHei",sans-serif'; g.lineWidth = 4; g.strokeStyle = '#2a2a10'; g.strokeText(String(n), W / 2, 34); g.fillStyle = '#f5e81a'; g.fillText(String(n), W / 2, 34);
   g.font = 'bold 32px "Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif'; g.strokeStyle = '#000'; g.lineWidth = 5; g.strokeText(S.counterLabel, W / 2, 80); g.fillStyle = '#fff'; g.fillText(S.counterLabel, W / 2, 80);

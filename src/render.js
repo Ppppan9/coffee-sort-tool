@@ -35,9 +35,9 @@ export function drawBoard(c, S, L, k) {
   const quad = (u0, v0, u1, v1) => { const a = G.P(u0, v0), b = G.P(u1, v0), d = G.P(u1, v1), e = G.P(u0, v1); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(d[0], d[1]); g.lineTo(e[0], e[1]); g.closePath(); };
   const fu = F / G.W, fv = F / G.H;
   // 外框（按掩码包围盒）
-  g.fillStyle = 'rgba(40,30,10,0.25)'; quad(-fu - 0.05, -fv + 0.1, L.cols + fu + 0.05, L.rows + 2); g.fill();
-  g.fillStyle = S.frameColor; quad(-fu, -fv, L.cols + fu, L.rows + 2); g.fill();
-  g.strokeStyle = S.frameLight; g.lineWidth = 2; quad(-fu + 0.02, -fv + 0.02, L.cols + fu - 0.02, L.rows + 2); g.stroke();
+  g.fillStyle = 'rgba(40,30,10,0.25)'; quad(-fu - 0.05, -fv + 0.1, L.cols + fu + 0.05, L.rows + fv + 0.12); g.fill();
+  g.fillStyle = S.frameColor; quad(-fu, -fv, L.cols + fu, L.rows + fv); g.fill();
+  g.strokeStyle = S.frameLight; g.lineWidth = 2; quad(-fu + 0.02, -fv + 0.02, L.cols + fu - 0.02, L.rows + fv - 0.02); g.stroke();
   // 格子底板：掩码内画浅蓝，掩码外画框色凸起
   for (let r = 0; r < L.rows; r++) for (let cc = 0; cc < L.cols; cc++) {
     const on = L.mask[r * L.cols + cc]; g.fillStyle = on ? S.floorColor : S.frameColor; quad(cc - 0.01, r - 0.01, cc + 1.01, r + 1.01); g.fill();

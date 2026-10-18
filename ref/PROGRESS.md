@@ -8,4 +8,5 @@
 ## 下一步
 - 视觉细节对齐（凹槽深度、杯子在托盘内）、对比图 screenshots/ref_vs_tool.jpg
 - test/run-test.mjs（自动通关+截图）、test:ae（ae-export / ae-mock / ae-composite，改自打螺丝）、export3d + test:3d
+- （M4 已完成：test:ae PASS PSNR≈35dB，test:3d BLENDER PASS + FBX）
 - 仓库 Ppppan9/coffee-sort-tool + GitHub Pages（不部署到 game.mmhygame.xyz —— 用户已取消）

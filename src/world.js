@@ -73,20 +73,21 @@ export function setBelt(W, pts2d) {
 // 杯子从传送带末端到托盘凹槽的轨迹（世界）：先水平前移（带面高度，必要时抬高越过已落下的杯子），到达凹槽正上方后竖直落入。
 // occ = 已占用（已落 / 先飞）的杯子世界位置 [[x, z, bottomY], ...]；返回 f(p) → [x, y, z]
 export function cupPath(W, from, to, occ) {
-  const [x0, y0, z0] = from, [x1, y1, z1] = to, yClr = Math.max(y1, to[3] ?? y1) ; // to[3] = 托盘顶面 + 间隙（水平段末端高度）
-  // 水平段：先在带面高度平移，直到整只杯子（含卷边）离开传送带末端平切面，再平滑下降到托盘顶面上方（不擦带体 / 挡边）
-  const PH = 0.68, Lh = Math.hypot(x1 - x0, z1 - z0) || 1, aHold = Math.min(0.85, (W.cupRT + W.cupRim + 1) / Lh), ssb = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
-  const base = a => a <= aHold ? y0 : y0 + (yClr - y0) * ssb((a - aHold) / (1 - aHold));
-  // 越障：沿水平段采样，若与已占杯子水平重叠（含卷边 + 1.5 单位余量），该段杯底必须高于其杯口；
+  const [x0, y0, z0] = from, [x1, y1, z1] = to, yClr = Math.max(y1, to[3] ?? y1); // to[3] = 托盘顶面 + 间隙（水平段末端高度）
+  // 水平路线：先沿传送带末端方向（+z）直线前移，直到整只杯子（含卷边）越过末端平切面（不横擦挡边 / 带体），再直线到凹槽正上方
+  const clr = W.cupRT + W.cupRim + 1, xa = x0, za = z0 + clr, L1 = clr, L2 = Math.hypot(x1 - xa, z1 - za), Lh = L1 + L2;
+  const hp = a => { const s = a * Lh; if (s <= L1) return [x0, z0 + s]; const u = (s - L1) / (L2 || 1); return [xa + (x1 - xa) * u, za + (z1 - za) * u]; };
+  const PH = 0.68, aHold = L1 / Lh, ssb = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
+  const base = a => a <= aHold ? y0 : y0 + (yClr - y0) * ssb((a - aHold) / (1 - aHold)); // 越过末端后平滑下降到托盘顶面上方
+  // 越障：沿水平路线采样，若与已占杯子水平重叠（含卷边 + 1.5 单位余量），该段杯底必须高于其杯口；
   // 抬升曲线 = 进入重叠段之前平滑抬起、重叠段内保持、离开后平滑落下（平顶，比正弦拱更低）
-  const need = W.cupRT + W.cupRim, N = 60; let hop = 0, a0 = 1, a1 = 0;
-  for (let k = 0; k <= N; k++) { const a = k / N, x = x0 + (x1 - x0) * a, z = z0 + (z1 - z0) * a;
-    for (const [ox, oz, ob] of occ) if (Math.hypot(x - ox, z - oz) < 2 * need + 1.5) { const req = ob + W.cupTop + 1.5 - Math.min(base(a), y0); if (req > 0) { hop = Math.max(hop, req); a0 = Math.min(a0, a); a1 = Math.max(a1, a); } } }
-  const ss = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
-  const bump = a => hop <= 0 ? 0 : a < a0 ? ss(a / Math.max(0.05, a0)) : a > a1 ? ss((1 - a) / Math.max(0.03, 1 - a1)) : 1;
-  const hAt = a => Math.max(base(a), Math.min(base(a), y0) + hop * bump(a));
-  return p => {
-    if (p < PH) { const a = easeIO(p / PH); return [x0 + (x1 - x0) * a, hAt(a), z0 + (z1 - z0) * a]; }
-    const b = (p - PH) / (1 - PH); return [x1, yClr + (y1 - yClr) * b * b, z1];
+  const need = W.cupRT + W.cupRim, N = 80; let hop = 0, a0 = 1, a1 = 0;
+  for (let k = 0; k <= N; k++) { const a = k / N, [x, z] = hp(a);
+    for (const [ox, oz, ob] of occ) if (Math.hypot(x - ox, z - oz) < 2 * need + 1.5) { const req = ob + W.cupTop + 1.5 - base(a); if (req > 0) { hop = Math.max(hop, req); a0 = Math.min(a0, a); a1 = Math.max(a1, a); } } }
+  const bump = a => hop <= 0 ? 0 : a < a0 ? ssb(a / Math.max(0.05, a0)) : a > a1 ? ssb((1 - a) / Math.max(0.03, 1 - a1)) : 1;
+  const f = p => {
+    if (p < PH) { const a = easeIO(p / PH), [x, z] = hp(a); return [x, base(a) + hop * bump(a), z]; }
+    const b = (p - PH) / (1 - PH); return [x1, yClr + (y1 - yClr) * b * b, z1]; // 到凹槽正上方后竖直落入
   };
+  f.hop = hop; return f;
 }

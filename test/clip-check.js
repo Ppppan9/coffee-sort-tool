@@ -101,7 +101,7 @@ window.__clipInit = function () {
     // ---- 2D 绘制顺序（画家算法）：屏幕上重叠的杯子，离相机近的必须后画 ----
     const ord = items.map((it, k) => [it, k]).filter(([it]) => /^cup_\d+$/.test(it.id) && it.op > 0.01);
     for (let i = 0; i < ord.length; i++) for (let j = i + 1; j < ord.length; j++) { const [a, ka] = ord[i], [b, kb] = ord[j]; const wa = S.cupSize * a.sx, wb = S.cupSize * b.sx; if (Math.abs(a.x - b.x) > (wa + wb) / 2 || Math.abs(a.y - b.y) > S.cupSize * 1.5) continue; // 屏幕重叠
-      const da = a.w ? a.w[2] : a.y, db = b.w ? b.w[2] : b.y; if (Math.abs(da - db) < 0.5) continue; const nearer = da > db ? ka : kb, farther = da > db ? kb : ka; // 世界 z 越大越近（旧版无世界锚点时用杯底屏幕 y）
+      const hm = 0.5 * cH * S.cupSize, dep = it => it.w ? -(v3.set(it.w[0], it.w[1] + hm, it.w[2]).applyMatrix4(R.camera.matrixWorldInverse).z) : -it.y, da = dep(a), db = dep(b); if (Math.abs(da - db) < 0.5) continue; const nearer = da < db ? ka : kb, farther = da < db ? kb : ka; // 杯身中点的相机深度，越小越近（旧版无世界锚点时用杯底屏幕 y）
       if (nearer < farther) A2('2D draw order (cup-cup)', 1, 0.5, { t: ctx.t, a: a.id, b: b.id }); else A2('2D draw order (cup-cup)', 0, 0.5, {}); }
   };
   st.report = () => ({ frames: st.frames, TOL_world: +st.TOL.toFixed(3), belt: st.belt, board: st.board, pairs: Object.fromEntries(Object.entries(st.pairs).map(([k, v]) => [k, { maxPen: +v.max.toFixed(2), violations: v.n, worstAt: v.at }])), align: Object.fromEntries(Object.entries(st.align).map(([k, v]) => [k, { max: +v.max.toFixed(3), tol: v.tol, violations: v.n, worstAt: v.at }])), samples: st.samples });

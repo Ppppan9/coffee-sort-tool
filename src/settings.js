@@ -58,6 +58,7 @@ export const GROUPS = [
     ['cupSize', '咖啡杯大小(近处宽 px)', 'range', 34, 16, 60, 1],
     ['beltTop', '传送带顶面色', 'color', '#93a9d6'],
     ['beltSide', '传送带侧面色', 'color', '#34497e'],
+    ['beltRail', '传送带挡边顶色(3D)', 'color', '#9fb8e8'],
     ['beltW', '传送带宽度(px)', 'range', 54, 20, 80, 1],
     ['cupGap', '杯子间距(近处 px)', 'range', 42, 20, 70, 1],
     ['counterShow', '显示杯数计数器', 'bool', true],

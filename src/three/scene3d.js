@@ -85,7 +85,7 @@ function setup(R, S, L, G, belt) {
   R.statics.add(mkStrip(ribbons.top, S.beltTop, 0.6, 0.1, bh, false));          // 带面（顶面色）
   // 两侧挡边
   const railRows = (s0, s1) => ribbons.top.map(([a, b, sc]) => [a.clone().lerp(b, s0), a.clone().lerp(b, s1), sc]);
-  R.statics.add(mkStrip(railRows(0, 0.1), S.beltSide, 0, 0, bh + rail)); R.statics.add(mkStrip(railRows(0.9, 1), S.beltSide, 0, 0, bh + rail));
+  R.statics.add(mkStrip(railRows(0, 0.1), S.beltRail, 0, 0, bh + rail)); R.statics.add(mkStrip(railRows(0.9, 1), S.beltRail, 0, 0, bh + rail));
   // 棋盘：底板（每个掩码格一块）+ 外框
   const floorM = new THREE.MeshStandardMaterial({ color: S.floorColor, roughness: 0.7 }), frameM = new THREE.MeshStandardMaterial({ color: S.frameColor, roughness: 0.55 });
   const quad = (pA, pB, pC, pD, h, m) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([pA.x, h, pA.z, pB.x, h, pB.z, pC.x, h, pC.z, pD.x, h, pD.z], 3)); g.setIndex([0, 2, 1, 1, 2, 3]); g.computeVertexNormals(); const me = new THREE.Mesh(g, m); me.receiveShadow = true; return me; };

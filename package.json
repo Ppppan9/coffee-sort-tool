@@ -14,7 +14,8 @@
     "test:drag": "node test/drag-test.mjs",
     "test:ae3d": "R3D=1 AE_OUT=/tmp/coffee_ae3d AE_ZIP=/workspace/coffee_ae3d_sample.zip node test/ae-export.mjs && node test/ae-mock.mjs /workspace/coffee_ae3d_sample.zip && CHECK_OUT=screenshots/ae_export_check_3d.jpg node test/ae-composite.mjs /workspace/coffee_ae3d_sample.zip /tmp/coffee_ae3d/snaps",
     "test:clip": "node test/clip-test.mjs",
-    "test:fill": "node test/cup-fill.mjs"
+    "test:fill": "node test/cup-fill.mjs",
+    "test:boxpack": "node test/box-pack.mjs"
   },
   "repository": {
     "type": "git",

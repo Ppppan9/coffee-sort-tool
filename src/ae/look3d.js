@@ -30,12 +30,13 @@ export async function build3DLook({ rec, S, G, belt, fps, Kr, segs }) {
   const out = [], drop = new Set(), tileRef = new Map();
   for (const g of segs) {
     if (!/^tile_\d+$/.test(g.tr.id) || tileRef.has(g.tr.id)) continue;
-    const e = g.s[0], it = { id: '__t', asset: g.tr.asset, x: e[1], y: e[2], sx: e[3], sy: e[4], rot: 0, op: 1, z: e[9] ?? g.tr.z, lift: 0 };
+    const e = g.s[0], it = { id: '__t' + g.tr.id, asset: g.tr.asset, x: e[1], y: e[2], sx: e[3], sy: e[4], rot: 0, op: 1, z: e[9] ?? g.tr.z, lift: 0 };
     im = shot([it]); const key = 'tile3d_' + g.tr.id.slice(5) + '_' + g.tr.asset.slice(5); put(key, im, bbox(im), e[1], e[2], { rs: [e[3], e[4]] }); tileRef.set(g.tr.id, key); await tick();
   }
   // 3) 杯子：每色 × 分带
-  const cupRef = new Map();
-  const cupKey = (asset, b, e) => { const k = asset + '|' + b; if (!cupRef.has(k)) { const it = { id: '__c', asset, x: e[1], y: e[2], sx: e[3], sy: e[4], rot: 0, op: 1, z: 2, lift: 0 }; const img = shot([it]); put('cup3d_' + asset.slice(4) + '_b' + b, img, bbox(img), e[1], e[2], { rs: [e[3], e[4]] }); cupRef.set(k, 'cup3d_' + asset.slice(4) + '_b' + b); } return cupRef.get(k); };
+  const cupRef = new Map(), cupBest = new Map(); // 每色 × 分带：取最靠近画面中线的传送带样本作为渲染位置（避免贴边被裁）
+  for (const g of segs) if (/^cup_\d+$/.test(g.tr.id)) for (const e of g.s) if (!(e[8] > 0) && (e[9] ?? g.tr.z) < 3) { const k = g.tr.asset + '|' + bandOf(e[2]), b = cupBest.get(k); if (!b || Math.abs(e[1] - DW / 2) < Math.abs(b[1] - DW / 2)) cupBest.set(k, e); }
+  const cupKey = (asset, b, e0) => { const k = asset + '|' + b; if (!cupRef.has(k)) { const e = cupBest.get(k) || e0, it = { id: '__c', asset, x: e[1], y: e[2], sx: e[3], sy: e[4], rot: 0, op: 1, z: 2, lift: 0 }; R.ground.visible = false; const img = shot([it]); R.ground.visible = true; put('cup3d_' + asset.slice(4) + '_b' + b, img, bbox(img), e[1], e[2], { rs: [e[3], e[4]] }); cupRef.set(k, 'cup3d_' + asset.slice(4) + '_b' + b); } return cupRef.get(k); };
   // 4) 纸箱：按 box_<i>_body 的元数据阶段（grow/close → 序列；fly → 静帧）
   const boxSegs = new Map(); for (const g of segs) { const m = /^box_(\d+)_/.exec(g.tr.id); if (m) { if (!boxSegs.has(m[1])) boxSegs.set(m[1], []); boxSegs.get(m[1]).push(g); drop.add(g); } }
   const plain = segs.map(g => ({ id: g.tr.id, asset: g.tr.asset, z: g.tr.z, s: g.s, m: g.tr.m || null }));

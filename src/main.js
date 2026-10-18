@@ -416,7 +416,7 @@ function stopRec() { if (rec && rec.state !== 'inactive') rec.stop(); }
 function updRecBtn() { const b = document.getElementById('btnRec'); b.textContent = rec ? '■ 停止录制' : '⏺ 开始录制'; b.classList.toggle('on', !!rec); }
 
 // ---------- AE / 3D 导出 ----------
-const aeRec = createAERecorder({ sfx, env: () => ({ L, st, S, A, items: draw.items || [], canvas: cv, handImg: hand.img }) });
+const aeRec = createAERecorder({ sfx, env: () => ({ L, st, S, A, G, belt, items: draw.items || [], canvas: cv, handImg: hand.img }) });
 let recClosed = false, aeLastRec = null, aeByRec = false;
 function recStart() { aeRec.start(); recClosed = false; updateAEButtons(); toast('开始记录 AE 时间轴'); }
 function aeActive() { return !!aeRec.rec && !recClosed; }
@@ -434,7 +434,7 @@ async function doExportAE(save = true, r0 = curRec()) {
 }
 async function doExport3D(save = true, r0 = curRec()) {
   if (!r0) { toast('请先用“开始记录”记录一段（自动通关或手动游玩）'); return null; }
-  status('正在生成 3D 动画…'); const ae = await aeRec.exportZip(r0, { aeFps: String(+S.export3dFps || 30), aeSize: 'canvas', aeSampling: 'bake', aeNames: 'en', aeAudio: 'both' });
+  status('正在生成 3D 动画…'); const ae = await aeRec.exportZip(r0, { aeFps: String(+S.export3dFps || 30), aeSize: 'canvas', aeSampling: 'bake', aeNames: 'en', aeAudio: 'both', aeLook: '2d' });
   const r = await export3D({ S: { ...r0.S, export3dFps: S.export3dFps, export3dHand: S.export3dHand, endCardHand: S.endCardHand }, ae, rec: r0, A, G, belt });
   window.__e3dLast = r; if (save) download(r.blob, r.name); status(`3D 动画：${r.stats.nodes} 节点，${r.duration.toFixed(2)}s`); return r;
 }

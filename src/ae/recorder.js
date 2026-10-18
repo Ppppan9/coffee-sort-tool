@@ -3,6 +3,7 @@
 import { makeZip } from './zip.js';
 import JSX_TEXT from './build_ae_project.jsx';
 import README_TEXT from './README_AE.md';
+import { build3DLook } from './look3d.js';
 import { renderSfxOffline, encodeWav, SFX_NAMES, SFX_DUR } from '../audio.js';
 const r3 = v => Math.round(v * 1000) / 1000;
 const LABEL = { bg: 15, board: 14, tile: 9, flash: 1, cup: 2, box: 11, ui: 15, nice: 5, end: 5, hand: 12, audio: 16 };
@@ -44,7 +45,7 @@ export function createAERecorder(api) {
   }
   async function exportZip(rec = R, So = null) {
     if (!rec || rec.frames < 2) throw new Error('没有可导出的记录：请先自动通关或手动游玩');
-    const E = api.env(), S = So ? { ...rec.S, ...So } : rec.S, AS = rec.A;
+    let AS2 = null; const E = api.env(), S = So ? { ...rec.S, ...So } : rec.S, AS = rec.A;
     const fps = +S.aeFps || 30, bake = S.aeSampling === 'bake', CW = 720, CH = 1280, zh = S.aeNames !== 'en';
     const D = Math.max(1 / fps, Math.ceil((rec.lastT + 1 / fps) * fps - 1e-6) / fps);
     const assets = [], assetFiles = [], pending = [], used = new Map();
@@ -52,7 +53,7 @@ export function createAERecorder(api) {
     const toPng = c => new Promise(res => c.toBlob(b => b.arrayBuffer().then(a => res(new Uint8Array(a))), 'image/png'));
     function assetFor(key) {
       if (used.has(key)) return used.get(key);
-      const a = AS[key]; const c = a.c instanceof HTMLCanvasElement ? a.c : (() => { const cc = document.createElement('canvas'); cc.width = a.c.width; cc.height = a.c.height; cc.getContext('2d').drawImage(a.c, 0, 0); return cc; })();
+      const a = (AS2 || AS)[key]; const c = a.c instanceof HTMLCanvasElement ? a.c : (() => { const cc = document.createElement('canvas'); cc.width = a.c.width; cc.height = a.c.height; cc.getContext('2d').drawImage(a.c, 0, 0); return cc; })();
       const file = 'assets/' + key + '.png', o = { id: key, file, folder: folderOf(key), w: c.width, h: c.height, name: key + '.png', kx: c.width / a.w, ky: c.height / a.h, ax: a.ax, ay: a.ay };
       assets.push(o); pending.push(toPng(c).then(data => assetFiles.push({ name: file, data }))); used.set(key, o); return o;
     }
@@ -74,15 +75,27 @@ export function createAERecorder(api) {
     }
     const keyCount = p => (p && typeof p === 'object' && !Array.isArray(p) && p.t) ? p.t.length : 0;
     // 每个轨道拆成连续出现段
-    const segs = [];
+    const segs = [], layers = [], markers = [], comps = [];
     for (const tr of rec.tracks.values()) {
       let a = 0; for (let i = 1; i <= tr.s.length; i++) if (i === tr.s.length || tr.s[i][7] !== tr.s[i - 1][7] + 1) { segs.push({ tr, s: tr.s.slice(a, i) }); a = i; }
     }
+    // v1.2：3D 外观（aeLook：auto = 记录时开启 3D 渲染则用 3D；3d；2d = v1.1 的 2D 精灵）
+    const look = S.aeLook === '3d' || (S.aeLook !== '2d' && S.render3d && E.G && E.belt), seqComps = []; let segs2 = segs;
+    if (look) {
+      const [w2] = S.aeSize && S.aeSize !== 'canvas' ? S.aeSize.split('x').map(Number) : [E.canvas.width];
+      const Kr = Math.min(2, Math.max(1, Math.round(w2 / CW * 100) / 100));
+      const L3 = await build3DLook({ rec, S, G: E.G, belt: E.belt, fps, Kr, segs });
+      AS2 = { ...AS, ...L3.assets }; segs2 = L3.segs; segs.length = 0; segs.push(...segs2);
+      for (const q of L3.seqs) for (const f of q.ls) assetFor(f.asset);
+      for (const q of L3.seqs) comps.push({ id: q.id, name: (zh ? '纸箱3D序列_' : 'Box3D_seq_') + q.variant, w: CW, h: CH, duration: r4(q.n / fps), fps, folder: 'pre', layers: q.ls.map((f, k) => ({ name: (zh ? '帧_' : 'Frame_') + String(k).padStart(3, '0'), src: { asset: f.asset }, in: r4(f.in), out: r4(f.out), label: LABEL.box, tr: { anchor: [0, 0], position: rnd(f.pos), scale: [100 / Kr, 100 / Kr] } })) });
+      for (const b of L3.boxLayers) seqComps.push({ z: b.z, layer: { name: (zh ? '纸箱_' : 'Box_') + b.i + (zh ? ' 3D序列' : ' 3D sequence'), src: { comp: b.seq.id }, start: r4(b.start), in: r4(b.start), out: r4(Math.min(D, b.end)), label: LABEL.box } });
+    }
     const nSeg = new Map(); segs.forEach(g => nSeg.set(g.tr.id + '|' + g.tr.asset, (nSeg.get(g.tr.id + '|' + g.tr.asset) || 0) + 1));
     segs.sort((p, q) => p.tr.z - q.tr.z || p.tr.order - q.tr.order || p.s[0][0] - q.s[0][0]);
-    const layers = [], markers = [], comps = [];
-    const segK = new Map();
+        const segK = new Map();
+    seqComps.sort((p, q) => p.z - q.z); let sq = 0;
     for (const g of segs) {
+      while (sq < seqComps.length && seqComps[sq].z <= g.tr.z) layers.push(seqComps[sq++].layer);
       const a = assetFor(g.tr.asset), fr = resample(g.s), tin = fr.f0 / fps;
       const last = g.s[g.s.length - 1], nextT = rec.frames - 1 > last[7] ? last[0] + 1 / fps : D;
       const tout = Math.min(D, Math.max(tin + 1 / fps, Math.round(nextT * fps) / fps));
@@ -96,6 +109,7 @@ export function createAERecorder(api) {
         opacity: prop(fr, e => Math.max(0, Math.min(100, e[6] * 100)), 0.5),
       } });
     }
+    while (sq < seqComps.length) layers.push(seqComps[sq++].layer);
     // 音频
     const audioFiles = [], ZH = n => (SFX_NAMES[n] || [0, n])[1];
     if (S.aeAudio !== 'none' && rec.sfx.length) {

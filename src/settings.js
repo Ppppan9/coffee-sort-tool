@@ -182,6 +182,7 @@ export const GROUPS = [
     ['aeFps', 'AE 合成帧率', 'select', '30', [['24', '24'], ['25', '25'], ['30', '30'], ['60', '60']]],
     ['aeSize', 'AE 合成尺寸', 'select', 'canvas', [['canvas', '同画布分辨率'], ['720x1280', '720×1280'], ['1080x1920', '1080×1920']]],
     ['aeSampling', '关键帧方式', 'select', 'reduce', [['reduce', '精简关键帧（线性插值，误差 <0.3px）'], ['bake', '逐帧烘焙（每帧一个关键帧）']]],
+    ['aeLook', 'AE 图层外观', 'select', 'auto', [['auto', '跟随页面（开启 3D 渲染时用 3D 渲染图层）'], ['3d', '3D 渲染图层（three.js 预渲染精灵 + 纸箱逐帧序列预合成）'], ['2d', '2D 精灵（v1.1 方式）']]],
     ['aeNames', '图层命名', 'select', 'zh', [['zh', '中文'], ['en', 'English']]],
     ['aeAudio', '音频', 'select', 'both', [['both', '混合音轨 + 逐事件音效层'], ['mixed', '仅混合音轨'], ['events', '仅逐事件音效层'], ['none', '不导出音频']]],
     ['aeSaveAep', '脚本跑完后提示另存为 .aep', 'bool', true],

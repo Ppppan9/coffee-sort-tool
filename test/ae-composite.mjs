@@ -83,7 +83,7 @@ const worst = res.slice().sort((a, b) => a.psnr - b.psnr).slice(0, 5); console.l
 if (process.env.DUMP) for (const r of res.filter(r => r.file === process.env.DUMP)) for (const k of ['ref', 'ours', 'diff']) fs.writeFileSync(`/tmp/dump_${k}.png`, Buffer.from(r._img[k].split(',')[1], 'base64'));
 const has = (r, re) => r.active.some(n => re.test(n));
 const pick = [];
-const want = [[/^托盘_\d+$/, '开局'], [/^纸箱_.*张开/, '纸箱'], [/^Nice_/, 'Nice'], [/^咖啡杯_/, '落杯'], [/^结束页/, '结束卡']];
+const want = [[/^托盘_\d+$/, '开局'], [/^纸箱_.*(张开|3D序列)/, '纸箱'], [/^Nice_/, 'Nice'], [/^咖啡杯_/, '落杯'], [/^结束页/, '结束卡']];
 for (const [re, label] of want) {
   const cands = res.filter(r => has(r, re) && !pick.some(p => p.r === r) && (label === '结束卡' || !has(r, /^结束页/)) && (label !== '开局' || r.t < 1.5));
   if (!cands.length) continue;

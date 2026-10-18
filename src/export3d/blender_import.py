@@ -162,6 +162,10 @@ def rebuild(mat):
         L.new(tex.outputs[0], mul.inputs[7])
         am = N.new("ShaderNodeMath"); am.operation = "MULTIPLY"; am.location = (100, -200)
         L.new(tex.outputs[1], am.inputs[0]); L.new(alpha_val.outputs[0], am.inputs[1]); alpha = am.outputs[0]
+        if mat.name.startswith("mat_end"):  # 结束页压暗层：网页在 sRGB 空间混合 → 线性空间等效 alpha' = 1-(1-a)^2.2
+            s1 = N.new("ShaderNodeMath"); s1.operation = "SUBTRACT"; s1.inputs[0].default_value = 1.0; L.new(alpha, s1.inputs[1])
+            pw = N.new("ShaderNodeMath"); pw.operation = "POWER"; L.new(s1.outputs[0], pw.inputs[0]); pw.inputs[1].default_value = 2.2
+            s2 = N.new("ShaderNodeMath"); s2.operation = "SUBTRACT"; s2.inputs[0].default_value = 1.0; L.new(pw.outputs[0], s2.inputs[1]); alpha = s2.outputs[0]
     else:
         mul.inputs[7].default_value = (1, 1, 1, 1)
     c = mul.outputs[2]
@@ -279,6 +283,10 @@ for name in meta.get("opacity", {}):
     if not o or not n or not o.parent or "in" not in n:
         continue
     p = o.parent
+    while p and not p.name.endswith("_vis"):  # v1.2：_vis → 节点(位置/缩放动画) → _q 贴片
+        p = p.parent
+    if not p:
+        continue
     ad = p.animation_data
     if ad and ad.action:
         for fc in [fc for fc in ad.action.fcurves if fc.data_path == "scale"]:

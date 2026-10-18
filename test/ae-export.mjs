@@ -18,7 +18,7 @@ const info = await p.evaluate(async () => {
   const buf = new Uint8Array(await r.blob.arrayBuffer()); let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
   return { zip: btoa(bin), name: r.name, stats: r.stats, files: r.files, duration: r.timeline.meta.duration, snaps: rec.snaps.map(s => ({ t: s.t, url: s.url })), st: { removed: __game.st.removed.size, tiles: __game.L.tiles.length } };
 });
-fs.writeFileSync('/workspace/coffee_ae_sample.zip', Buffer.from(info.zip, 'base64'));
+fs.writeFileSync(process.env.AE_ZIP || '/workspace/coffee_ae_sample.zip', Buffer.from(info.zip, 'base64'));
 const map = {}; info.snaps.forEach((s, i) => { const f = String(i).padStart(3, '0') + '.png'; fs.writeFileSync(`${OUT}/snaps/${f}`, Buffer.from(s.url.split(',')[1], 'base64')); map[f] = s.t; });
 fs.writeFileSync(`${OUT}/snaps/snaps.json`, JSON.stringify(map));
 if (process.env.E3D) {

@@ -1,4 +1,4 @@
-import { levelFromLayout, REF_LAYOUT, generateLevel, initState, canSend, applySend, done, stuck, solve, capacity, frontColor, maskFromAlpha, connectMask, planQueue } from './level.js';
+import { levelFromLayout, REF_LAYOUT, generateLevel, initState, canSend, applySend, done, stuck, solve, solvePlan, slideAxis, isGoal, applyPark, reachCells, capacity, frontColor, maskFromAlpha, connectMask, planQueue } from './level.js';
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID } from './settings.js';
 import { DW, DH, mk, boardGeo, drawBackground, drawBoard, tileSprite, slotPositions, cupSprite, boxSprite, counterSprite, niceSprite, sparkSprite, beltPath, beltScale, drawBelt, defaultHand, tileColor } from './render.js';
 import { Sfx } from './audio.js';
@@ -124,13 +124,14 @@ function step(t) {
     }
   }
   jobs = jobs.filter(j => j.ph !== 'done');
+  vis.tiles.forEach(tv => { if (tv.snap) { const p = easeIO((t - tv.snap.t0) / tv.snap.dur); tv.u = tv.snap.u0 + (tv.snap.u1 - tv.snap.u0) * p; tv.v = tv.snap.v0 + (tv.snap.v1 - tv.snap.v0) * p; if (p >= 1) tv.snap = null; } });
   // 落杯
   vis.cupFly = vis.cupFly.filter(c => { if (t - c.t0 >= S.cupFly) { vis.inTile.set(c.q, c); vis.landed++; sfx.play('cup', S); return false; } return true; });
   // 传送带推进（平滑）
   vis.head += (vis.headTarget - vis.head) * Math.min(1, 0.012 * (t - (step.lt || t)) * (S.cupFly / 150 > 0 ? 150 / S.cupFly : 1) * 1.6); if (Math.abs(vis.headTarget - vis.head) < 0.002) vis.head = vis.headTarget; step.lt = t;
   vis.nices = vis.nices.filter(n => t - n.t0 < Math.max(1, S.niceDur));
   if (!finishedAt && done(L, st) && !jobs.length && !vis.cupFly.length) { finishedAt = t; onFinish(); }
-  if (!finishedAt && !failedAt && !jobs.length && stuck(L, st) && S.mismatchRule !== 'allow') { failedAt = t; status('没有可送出的托盘（失败）——点“↻ 重新开始”'); window.__failed = true; }
+  if (!finishedAt && !failedAt && !jobs.length && !drag && !autoRunning && t - (step.stuckT || 0) > 600 && (step.stuckT = t) && stuck(L, st) && S.mismatchRule !== 'allow') { failedAt = t; status('没有可送出的托盘（失败）——点“↻ 重新开始”'); window.__failed = true; }
 }
 
 // ---------- 场景（每帧精灵列表；画布绘制 / AE / 3D 同源）----------
@@ -233,9 +234,60 @@ function screenToBoard(x, y) { const dy = y - S.boardTop, v = dy / (S.cellH + S.
 function hitTile(x, y) { const [u, v] = screenToBoard(x, y); return st.tiles.findIndex((t, i) => !st.removed.has(i) && u >= t.c && u < t.c + t.w && v >= t.r && v < t.r + t.h); }
 function tapAt(x, y) { sfx.resume(); if (S.tapRipple) ripples.push({ x, y, t0: now() }); if (finishedAt) return false; const i = hitTile(x, y); if (i < 0) return false; return tapTile(i); }
 function evtPos(e) { const r = cv.getBoundingClientRect(); const px = (e.clientX - r.left) / r.width * cv.width, py = (e.clientY - r.top) / r.height * cv.height; const v = view(); return { x: px / v.k, y: (py - v.oy) / v.k }; }
-cv.addEventListener('pointerdown', e => { if (autoRunning) return; const p = evtPos(e); hand.x = p.x; hand.y = p.y; hand.visible = true; if (S.pressEnabled) hand.pressT0 = now(); tapAt(p.x, p.y); });
-cv.addEventListener('pointermove', e => { if (autoRunning) return; const p = evtPos(e); hand.x = p.x; hand.y = p.y; hand.visible = true; });
-cv.addEventListener('pointerleave', () => { if (!autoRunning) hand.visible = false; });
+// ---------- 拖动（参考：触控笔按住托盘在空格中自由滑动，可停在任意空格，拖进出口即送出）----------
+let drag = null;
+const tileXY = i => { const tv = vis.tiles[i], t = st.tiles[i]; return [tv.u - t.w / 2, tv.v - 0.5]; };
+function dragBegin(i, px, py) {
+  if (i < 0 || st.removed.has(i) || drag) return false;
+  const tv = vis.tiles[i], [u, v] = screenToBoard(px, py), [x, y] = tileXY(i);
+  tv.snap = null; tv.press = now(); sfx.play('pop', S); st.dockBlock = true;
+  drag = { i, gu: u - x, gv: v - y, x, y, x0: st.tiles[i].c, y0: st.tiles[i].r, sx: px, sy: py, moved: 0, t0: now() };
+  return true;
+}
+function dragMove(px, py) {
+  if (!drag) return; const d = drag, t = st.tiles[d.i], [u, v] = screenToBoard(px, py);
+  d.moved = Math.max(d.moved, Math.hypot(px - d.sx, py - d.sy));
+  const tx = u - d.gu, ty = v - d.gv; let x = d.x, y = d.y;
+  for (let n = 0; n < 40; n++) { // 小步推进：主轴优先，另一轴接近整数时吸附（拐角辅助）
+    const dx = tx - x, dy = ty - y; if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) break;
+    const ax = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+    const off = ax === 'x' ? y - Math.round(y) : x - Math.round(x);
+    if (Math.abs(off) > 1e-3 && Math.abs(off) < S.dragAssist) { if (ax === 'x') y = slideAxis(L, st, d.i, x, y, 'y', -Math.sign(off) * Math.min(Math.abs(off), 0.2)); else x = slideAxis(L, st, d.i, x, y, 'x', -Math.sign(off) * Math.min(Math.abs(off), 0.2)); }
+    const stepv = Math.max(-0.2, Math.min(0.2, ax === 'x' ? dx : dy));
+    const nx = ax === 'x' ? slideAxis(L, st, d.i, x, y, 'x', stepv) : x, ny = ax === 'y' ? slideAxis(L, st, d.i, x, y, 'y', stepv) : y;
+    if (nx === x && ny === y) { // 主轴被挡：试另一轴
+      const o = ax === 'x' ? dy : dx; if (Math.abs(o) < 1e-3) break;
+      const sv = Math.max(-0.2, Math.min(0.2, o)); const mx = ax === 'y' ? slideAxis(L, st, d.i, x, y, 'x', sv) : x, my = ax === 'x' ? slideAxis(L, st, d.i, x, y, 'y', sv) : y;
+      if (mx === x && my === y) break; x = mx; y = my;
+    } else { x = nx; y = ny; }
+  }
+  d.x = x; d.y = y; const tv = vis.tiles[d.i]; tv.u = x + t.w / 2; tv.v = y + 0.5; tv.moving = true;
+}
+function dragEnd(allowTap = true) {
+  if (!drag) return null; const d = drag, i = d.i, t = st.tiles[i], tv = vis.tiles[i]; drag = null; tv.moving = false; st.dockBlock = false;
+  const c = Math.round(d.x), r = Math.round(d.y);
+  if (d.moved < 8 && c === d.x0 && r === d.y0) { snapTo(i, c, r); if (allowTap && S.inputMode !== 'drag') return tapTile(i) ? 'send' : 'tap'; return 'none'; }
+  if (isGoal(L, t, c, r) && st.docked < 0) {
+    const okColor = t.color === frontColor(st) || S.mismatchRule === 'allow';
+    if (okColor) { applyPark(L, st, i, c, r); sendFromHere(i); return 'send'; }
+    tv.shake = now(); tv.flash = now(); sfx.play('error', S); applyPark(L, st, i, c, r); return 'reject';
+  }
+  applyPark(L, st, i, c, r); snapTo(i, c, r); return 'park';
+}
+function snapTo(i, c, r) { const tv = vis.tiles[i], t = st.tiles[i]; tv.snap = { u0: tv.u, v0: tv.v, u1: c + t.w / 2, v1: r + 0.5, t0: now(), dur: 110 }; }
+function sendFromHere(i) { // 已在出口格：滑到出口中心并开始装杯
+  const t = st.tiles[i], tv = vis.tiles[i]; applySend(L, st, i); st.docked = i;
+  const pts = [[tv.u, tv.v], [L.cols / 2, L.dockRow + 0.5]], len = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
+  jobs.push({ i, ph: 'slide', t0: now(), pts, lens: [0, len], dur: Math.max(60, len / S.slideSpeed * 1000), n: capacity(t), got: 0, nextCup: 0 });
+}
+cv.addEventListener('pointerdown', e => { if (autoRunning) return; sfx.resume(); const p = evtPos(e); hand.x = p.x; hand.y = p.y; hand.visible = true; if (S.pressEnabled) hand.pressT0 = now(); if (S.tapRipple) ripples.push({ x: p.x, y: p.y, t0: now() }); if (finishedAt) return;
+  const i = hitTile(p.x, p.y); if (i < 0) return;
+  if (S.inputMode === 'tap') { tapTile(i); return; }
+  if (dragBegin(i, p.x, p.y)) { hand.follow = i; try { cv.setPointerCapture(e.pointerId); } catch (_) { } } });
+cv.addEventListener('pointermove', e => { if (autoRunning) return; const p = evtPos(e); hand.x = p.x; hand.y = p.y; hand.visible = true; if (drag) dragMove(p.x, p.y); });
+cv.addEventListener('pointerup', () => { if (autoRunning || !drag) return; dragEnd(); hand.follow = null; hand.pressT0 = null; });
+cv.addEventListener('pointercancel', () => { if (drag) { dragEnd(false); hand.follow = null; } });
+cv.addEventListener('pointerleave', () => { if (!autoRunning && !drag) hand.visible = false; });
 function updPress(t) { if (!S.pressEnabled || hand.pressT0 == null) { hand.press = 0; return; } const p = (t - hand.pressT0) / 180; hand.press = p < 0 || p > 1 ? (hand.follow ? 1 : 0) : (hand.follow && p > 0.5 ? 1 : Math.sin(Math.PI * p)); }
 
 // ---------- 自动通关 ----------
@@ -247,10 +299,33 @@ async function moveHand(tx, ty, tok) {
   const cx = (x0 + tx) / 2 + (Math.random() - 0.3) * 60, cy = (y0 + ty) / 2 + 40 + Math.random() * 40;
   while (true) { if (tok !== autoToken) throw 'stop'; const p = Math.min(1, (now() - t0) / dur), e = easeIO(p); hand.x = (1 - e) * (1 - e) * x0 + 2 * (1 - e) * e * cx + e * e * tx; hand.y = (1 - e) * (1 - e) * y0 + 2 * (1 - e) * e * cy + e * e * ty; if (p >= 1) return; await frame(); }
 }
+function stepValid(p) { if (st.removed.has(p.i)) return false; const t = st.tiles[p.i]; if (t.c !== p.path[0][0] || t.r !== p.path[0][1]) return false; if (!p.park) return canSend(L, st, p.i).ok; return reachCells(L, st, p.i).has(p.park[1] * L.cols + p.park[0]); }
+async function followSlide(i, tok) { const tv = vis.tiles[i], [x, y] = tileScreen(tv.u, tv.v), dx = hand.x - x, dy = hand.y - y; hand.follow = i; const job = jobs.find(q => q.i === i); while (job && job.ph === 'slide') { if (tok !== autoToken) throw 'stop'; const [hx, hy] = tileScreen(tv.u, tv.v); hand.x = hx + dx; hand.y = hy + dy; await frame(); } hand.follow = null; hand.pressT0 = null; }
+// 自动通关拖动：手（笔尖）按住托盘，沿格子路径拖到目标格（暂存或出口），托盘与笔尖严格同步
+async function autoDrag(stp, tok) {
+  const i = stp.i, t = st.tiles[i];
+  if (!dragBegin(i, hand.x, hand.y)) return; hand.follow = i;
+  const d = drag, pts = stp.path.map(([c, r]) => [c, r]);
+  const spd = S.slideSpeed * S.autoSpeed / 1000; // 格/ms
+  for (let k = 1; k < pts.length; k++) {
+    const [ax, ay] = [d.x, d.y], [bx, by] = pts[k], len = Math.hypot(bx - ax, by - ay), dur = Math.max(16, len / spd), t0 = now();
+    while (true) {
+      if (tok !== autoToken) { dragEnd(false); throw 'stop'; }
+      const p = Math.min(1, (now() - t0) / dur), e = k === 1 && pts.length === 2 ? easeIO(p) : p;
+      const tx = ax + (bx - ax) * e, ty = ay + (by - ay) * e;
+      const [px, py] = tileScreen(tx + d.gu, ty + d.gv); dragMove(px, py);
+      const [hx, hy] = tileScreen(d.x + d.gu, d.y + d.gv); hand.x = hx; hand.y = hy;
+      if (p >= 1) break; await frame();
+    }
+  }
+  await wait(40, tok);
+  dragEnd(false); hand.follow = null; hand.pressT0 = null;
+  if (st.docked === i) await followSlide(i, tok);
+}
 async function autoSolve() {
   if (autoRunning) { autoToken++; autoRunning = false; hand.visible = false; hand.follow = null; updAutoBtn(); return; }
   if (finishedAt || failedAt) newGame();
-  let plan = solve(L, st); if (!plan) { status('当前局面无解，请重新开始'); return; }
+  let plan = solvePlan(L, st); if (!plan) { status('当前局面无解，请重新开始'); return; }
   const tok = ++autoToken; autoRunning = true; updAutoBtn(); sfx.resume();
   hand.x = 820; hand.y = 1450; hand.visible = true;
   if (S.autoRec && !rec) startRec();
@@ -258,18 +333,13 @@ async function autoSolve() {
     await wait(S.autoStartDelay, tok);
     while (!done(L, st)) {
       while (st.docked >= 0) { if (tok !== autoToken) throw 'stop'; await frame(); }
-      if (!plan.length || !canSend(L, st, plan[0]).ok) { plan = solve(L, st) || []; if (!plan.length) { status('当前局面无解'); break; } }
-      const i = plan.shift(), tv = vis.tiles[i], [x, y] = tileScreen(tv.u, tv.v), j = S.jitter;
+      if (!plan.length || !stepValid(plan[0])) { plan = solvePlan(L, st) || []; if (!plan.length) { status('当前局面无解'); break; } }
+      const stp = plan.shift(), i = stp.i, tv = vis.tiles[i], [x, y] = tileScreen(tv.u, tv.v), j = S.jitter;
       await moveHand(x + (Math.random() - 0.5) * j, y + (Math.random() - 0.5) * j, tok);
       if (S.pressEnabled) hand.pressT0 = now();
       await wait(60, tok);
-      const dx = hand.x - x, dy = hand.y - y;
-      if (!tapTile(i)) { await wait(300, tok); continue; }
-      if (S.handFollow) { // 按住托盘跟随滑动（参考：触控笔拖动）
-        hand.follow = i; const job = jobs.find(q => q.i === i);
-        while (job && job.ph === 'slide') { if (tok !== autoToken) throw 'stop'; const [hx, hy] = tileScreen(tv.u, tv.v); hand.x = hx + dx; hand.y = hy + dy; await frame(); }
-        hand.follow = null; hand.pressT0 = null;
-      }
+      if (S.autoMode === 'tap' && !stp.park) { if (!tapTile(i)) { await wait(300, tok); continue; } await followSlide(i, tok); }
+      else await autoDrag(stp, tok);
       await wait(rr(S.delayMin, S.delayMax) + (Math.random() < S.thinkChance ? Math.random() * S.thinkMax : 0), tok);
     }
     while (jobs.length) { if (tok !== autoToken) throw 'stop'; await frame(); }
@@ -389,6 +459,6 @@ document.getElementById('btnExport').onclick = () => { const a = document.create
 document.getElementById('btnImport').onclick = () => document.getElementById('importFile').click();
 document.getElementById('importFile').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { const j = JSON.parse(t); S = migrate(j); saveSettings(S); buildPanel(); loadHand(); newGame(); toast('已导入设置'); }).catch(() => toast('导入失败')); };
 document.getElementById('btnReset').onclick = () => { if (!confirm('恢复全部默认设置？')) return; S = { ...DEFS }; saveSettings(S); buildPanel(); loadHand(); newGame(); };
-window.__game = { autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
+window.__game = { autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), dragBegin, dragMove, dragEnd, get drag() { return drag; }, get hand() { return hand; }, solvePlanNow: () => solvePlan(L, st), screenToBoard: (x, y) => screenToBoard(x, y), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
 buildPanel(); loadHand(); newGame();
 requestAnimationFrame(loop);

@@ -16,6 +16,8 @@ export const GROUPS = [
     ['checker', '棕/奶油棋盘格排列(随机关，参考风格)', 'bool', true],
     ['wideChance', '绿色 1×2 宽托盘概率', 'range', 0.06, 0, 0.6, 0.01],
     ['runBias', '杯子队列同色连续倾向', 'range', 0.35, 0, 1, 0.01],
+    ['inputMode', '操作方式', 'select', 'both', [['both', '拖动 + 点击自动送出（默认）'], ['drag', '仅拖动（参考：触控笔拖动）'], ['tap', '仅点击（自动沿最短路径滑到出口）']]],
+    ['dragAssist', '拖动拐角吸附(格)', 'range', 0.45, 0, 0.5, 0.01],
     ['mismatchRule', '颜色不符时', 'select', 'reject', [['reject', '拒绝：抖动 + 红光 + 错误音'], ['allow', '允许：任何颜色都可送到出口（只看路径）']]],
   ]],
   ['导入透明图形生成关卡', [
@@ -120,6 +122,7 @@ export const GROUPS = [
     ['tapRipple', '点击处显示波纹圈（参考视频没有）', 'bool', false],
     ['handShow', '显示手指', 'bool', true],
     ['handFollow', '托盘滑动时手指按住跟随（参考：拖动）', 'bool', true],
+    ['autoMode', '自动通关方式', 'select', 'drag', [['drag', '拖动（手+笔尖按住托盘沿路径拖到出口/空格，参考）'], ['tap', '点击后托盘自动滑行（暂存仍用拖动）']]],
     ['autoStartDelay', '开始前等待(ms)', 'range', 400, 0, 5000, 50],
   ]],
   ['录制', [

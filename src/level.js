@@ -17,6 +17,7 @@ const inMask = (L, c, r) => c >= 0 && r >= 0 && c < L.cols && r < L.rows && L.ma
 export function occGrid(L, st, ignore = -1) {
   const g = new Int16Array(L.cols * L.rows).fill(-1);
   st.tiles.forEach((t, i) => { if (st.removed.has(i) || i === ignore) return; for (let y = 0; y < t.h; y++) for (let x = 0; x < t.w; x++) g[(t.r + y) * L.cols + t.c + x] = i; });
+  if (st.docked >= 0 && st.dockBlock) for (const [c, r] of dockCells(L, 2)) g[r * L.cols + c] = 32000; // 出口正在装杯：拖动时出口格视为占用
   return g;
 }
 function fits(L, g, c, r, w, h) { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { if (!inMask(L, c + x, r + y) || g[(r + y) * L.cols + c + x] >= 0) return false; } return true; }
@@ -50,7 +51,7 @@ export function canSend(L, st, i) {
 // 逻辑上立即完成：托盘离开棋盘，消耗 capacity 个杯子
 export function applySend(L, st, i) { const t = st.tiles[i]; st.removed.add(i); st.qi += capacity(t); }
 export const done = (L, st) => st.removed.size === st.tiles.length;
-export function stuck(L, st) { if (done(L, st)) return false; return !st.tiles.some((_, i) => canSend(L, st, i).ok); }
+export function stuck(L, st) { if (done(L, st)) return false; if (st.tiles.some((_, i) => canSend(L, st, i).ok)) return false; return !solvePlan(L, st, 4000, 2); }
 // 求解：DFS（同色候选按“移走后新增可达托盘数”排序）+ 已访问状态记忆 + 节点预算；失败返回 null
 export function solve(L, st0, budget = 60000) {
   const st = { ...st0, removed: new Set(st0.removed), docked: -1 }, plan = [], seen = new Set(); let nodes = 0;
@@ -180,4 +181,58 @@ export function connectMask(mask, cols, rows, dockRow = 0) {
   while (q.length) { const k = q.pop(), c = k % cols, r = Math.floor(k / cols); for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nc = c + dc, nr = r + dr, nk = nr * cols + nc; if (nc < 0 || nr < 0 || nc >= cols || nr >= rows || seen[nk] || !m[nk]) continue; seen[nk] = 1; q.push(nk); } }
   for (let k = 0; k < m.length; k++) if (!seen[k]) m[k] = 0;
   return m;
+}
+
+// ---------- 拖动 / 暂存（参考：触控笔把托盘拖到任意空格）----------
+export const isGoal = (L, t, c, r) => { const dk = dockCells(L, t.w), cs = dk.map(d => d[0]); return r === L.dockRow && c >= Math.min(...cs) && c + t.w - 1 <= Math.max(...cs); };
+// 托盘 i 作为刚体能到达的所有格子位置：Map(key=r*cols+c → path[[c,r],...])
+export function reachCells(L, st, i) {
+  const t = st.tiles[i], g = occGrid(L, st, i), key = (c, r) => r * L.cols + c, prev = new Map([[key(t.c, t.r), null]]), q = [[t.c, t.r]], out = new Map();
+  while (q.length) {
+    const [c, r] = q.shift(); const k0 = key(c, r);
+    const path = []; let k = k0; while (k != null) { path.unshift([k % L.cols, Math.floor(k / L.cols)]); k = prev.get(k); } out.set(k0, path);
+    for (const [dc, dr] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) { const nc = c + dc, nr = r + dr, kk = key(nc, nr); if (prev.has(kk) || !fits(L, g, nc, nr, t.w, t.h)) continue; prev.set(kk, k0); q.push([nc, nr]); }
+  }
+  return out;
+}
+export function applyPark(L, st, i, c, r) { st.tiles[i].c = c; st.tiles[i].r = r; }
+// 连续拖动的碰撞：托盘左上角 (x, y)（格单位，浮点）沿一个轴移动 d，返回被空格/掩码限制后的新坐标
+export function slideAxis(L, st, i, x, y, axis, d) {
+  const t = st.tiles[i], g = occGrid(L, st, i), e = 1e-4;
+  const free = (c, r) => inMask(L, c, r) && g[r * L.cols + c] < 0;
+  if (axis === 'x') {
+    const r0 = Math.floor(y + e), r1 = Math.ceil(y + t.h - e) - 1; let nx = x + d;
+    if (d > 0) { for (let c = Math.ceil(x + t.w - e); c <= Math.floor(nx + t.w - e) + 1; c++) { let ok = true; for (let r = r0; r <= r1; r++) if (!free(c, r)) ok = false; if (!ok) { nx = Math.min(nx, c - t.w); break; } } }
+    else if (d < 0) { for (let c = Math.floor(x + e) - 1; c >= Math.floor(nx + e) - 1; c--) { let ok = true; for (let r = r0; r <= r1; r++) if (!free(c, r)) ok = false; if (!ok) { nx = Math.max(nx, c + 1); break; } } }
+    return d > 0 ? Math.max(x, nx) : Math.min(x, nx);
+  }
+  const c0 = Math.floor(x + e), c1 = Math.ceil(x + t.w - e) - 1; let ny = y + d;
+  if (d > 0) { for (let r = Math.ceil(y + t.h - e); r <= Math.floor(ny + t.h - e) + 1; r++) { let ok = true; for (let c = c0; c <= c1; c++) if (!free(c, r)) ok = false; if (!ok) { ny = Math.min(ny, r - t.h); break; } } }
+  else if (d < 0) { for (let r = Math.floor(y + e) - 1; r >= Math.floor(ny + e) - 1; r--) { let ok = true; for (let c = c0; c <= c1; c++) if (!free(c, r)) ok = false; if (!ok) { ny = Math.max(ny, r + 1); break; } } }
+  return d > 0 ? Math.max(y, ny) : Math.min(y, ny);
+}
+// 带暂存的求解：步骤 {i, park:null|[c,r], path}；先试纯发送（快），失败再允许把托盘挪到空格暂存
+export function solvePlan(L, st0, budget = 40000, maxParks = 3) {
+  for (let m = 1; m < maxParks; m++) { const r = solvePlan1(L, st0, budget / 4, m); if (r) return r; }
+  return solvePlan1(L, st0, budget, maxParks);
+}
+function solvePlan1(L, st0, budget, maxParks) {
+  const p0 = solve(L, st0, Math.min(budget, 20000));
+  if (p0) { const s = { ...st0, tiles: st0.tiles.map(t => ({ ...t })), removed: new Set(st0.removed), docked: -1 }; return p0.map(i => { const path = findPath(L, s, i); applySend(L, s, i); return { i, park: null, path }; }); }
+  const st = { ...st0, tiles: st0.tiles.map(t => ({ ...t })), removed: new Set(st0.removed), docked: -1 }, plan = [], seen = new Set(); let nodes = 0;
+  const keyOf = () => st.qi + '|' + st.tiles.map((t, i) => st.removed.has(i) ? 'x' : t.c + ',' + t.r).join(';');
+  function dfs(parks) {
+    if (done(L, st)) return true; if (++nodes > budget) return false;
+    const k = keyOf(); if (seen.has(k)) return false; seen.add(k);
+    const fc = frontColor(st);
+    for (let i = 0; i < st.tiles.length; i++) { const t = st.tiles[i]; if (st.removed.has(i) || t.color !== fc) continue; const path = findPath(L, st, i); if (!path) continue; const qi = st.qi; applySend(L, st, i); plan.push({ i, park: null, path }); if (dfs(0)) return true; plan.pop(); st.removed.delete(i); st.qi = qi; }
+    if (parks >= maxParks) return false;
+    // 暂存：优先挪动挡住同色托盘的托盘，目标格按离出口距离远近排序（远的不挡路）
+    const cands = [];
+    st.tiles.forEach((t, i) => { if (st.removed.has(i)) return; for (const [kk, path] of reachCells(L, st, i)) { if (path.length < 2) continue; const c = kk % L.cols, r = Math.floor(kk / L.cols); if (isGoal(L, t, c, r)) continue; cands.push([i, c, r, path, (t.color === fc ? -2 : 0) + Math.abs(c + t.w / 2 - L.cols / 2) * -0.3 + r * -0.5]); } });
+    cands.sort((a, b) => a[4] - b[4]);
+    for (const [i, c, r, path] of cands.slice(0, 60)) { const t = st.tiles[i], oc = t.c, or = t.r; t.c = c; t.r = r; plan.push({ i, park: [c, r], path }); if (dfs(parks + 1)) return true; plan.pop(); t.c = oc; t.r = or; }
+    return false;
+  }
+  return dfs(0) ? plan : null;
 }

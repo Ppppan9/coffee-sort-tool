@@ -1,12 +1,13 @@
 # PROGRESS（咖啡分拣核玩工具）
 
 ## 已完成
-- M1：参考分析（ref/ANALYSIS.md）、脚手架（build.mjs 单文件、settings.js 版本化 + migrate）、核心逻辑 src/level.js（BFS 刚体路径、DFS 求解、生成器保证可解、alpha 掩码量化 + 出口连通）、test/logic-test.mjs（npm run test:logic 全过）。
-- 可玩：src/main.js 精灵场景（scene() → 画布 / AE / 3D 同源），点击托盘 → 滑到出口 → 落杯 → 纸箱合盖 → 飞向计数器 → Nice；被挡抖动 + 红光 + 错误音；内置“手 + 触控笔”；自动通关（手指按住跟随滑动）。
-- AE 记录器 src/ae/recorder.js（通用精灵轨道 → 每段一个图层），jsx/README 改自打螺丝。
+- M1 参考分析（ref/ANALYSIS.md）+ 脚手架 + 核心逻辑（src/level.js）+ test:logic ✅
+- M2 画面对齐参考（screenshots/ref_vs_tool.jpg）、动画（滑动 / 落杯 / 纸箱 / Nice / 抖动红光 / 按下）、合成音效（每种音效开关 + 音量）、内置手 + 触控笔自动通关 ✅（npm test：67 托盘 / 280 杯全部通关）
+- M3 透明 PNG 导入 + 可解生成器 ✅（test:shape）
+- M4 AE 导出（test:ae PASS，PSNR 平均≈35dB）+ 3D 导出（test:3d BLENDER PASS，FBX）✅；录制规则 test:norec ✅
+- M5 GitHub 仓库 Ppppan9/coffee-sort-tool + Pages（用户已取消 game.mmhygame.xyz 部署）
 
-## 下一步
-- 视觉细节对齐（凹槽深度、杯子在托盘内）、对比图 screenshots/ref_vs_tool.jpg
-- test/run-test.mjs（自动通关+截图）、test:ae（ae-export / ae-mock / ae-composite，改自打螺丝）、export3d + test:3d
-- （M4 已完成：test:ae PASS PSNR≈35dB，test:3d BLENDER PASS + FBX）
-- 仓库 Ppppan9/coffee-sort-tool + GitHub Pages（不部署到 game.mmhygame.xyz —— 用户已取消）
+## 已知差距 / 下一步
+- 参考里是用触控笔“拖动”托盘自由滑动；本工具是点击后自动沿最短路径滑动（手指跟随模拟拖动），不支持手动拖到任意空格暂存。
+- 托盘 / 杯子 / 纸箱为 2D 程序化绘制（含透视缩放），没有参考的真实 3D 光照与景深；纸箱翻盖为两帧切换 + 缩放，非连续翻折。
+- 传送带车道位置按参考第 0 帧测量，透视为近似线性缩放。

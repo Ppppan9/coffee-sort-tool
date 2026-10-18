@@ -1,4 +1,5 @@
 // 绘制：所有元素都是“精灵”（素材画布 + 中心位置/缩放/旋转/不透明度），画面与 AE / 3D 导出完全同源。
+import { bowlRCell } from './world.js';
 export const DW = 720, DH = 1280;
 export const mk = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return c; };
 function rr(g, x, y, w, h, r) { r = Math.max(0, Math.min(r, w / 2, h / 2)); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -67,7 +68,7 @@ export function tileSprite(S, color, w, h, k, opts = {}) {
   g.strokeStyle = shade(base, 0.35); g.lineWidth = 1.2; rr(g, 0.8, 0.8, W - 1.6, H - 1.6, S.tileRadius - 1); g.stroke();
   // 凹槽（2×2 每格）：半球凹陷——上沿暗、下沿亮
   const slots = slotPositions(S, w, h);
-  const br = Math.min(CW, CH) / 4 * S.bowlSize;
+  const br = Math.min(CW, CH) * bowlRCell(S); // 与 3D 凹槽同一半径（world.js bowlRCell）
   for (const [sx, sy] of slots) {
     const x = sx + W / 2, y = sy + H / 2, d = S.bowlDepth, ry = br * CH / CW * 1.02;
     // 凹陷半球：上半部分背光（暗），下半部分受光（亮），边缘一圈细高光

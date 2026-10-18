@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { DW, DH, LANES } from '../render.js';
-import { createWorld, setBelt } from '../world.js';
+import { createWorld, setBelt, TILE_BEVEL, bowlRCell } from '../world.js';
 
 const COLS = S => ({ brown: S.colBrown, cream: S.colCream, green: S.colGreen });
 const CUPC = S => ({ brown: [S.cupBrown, S.cupBrownLiq], cream: [S.cupCream, S.cupCreamLiq], green: [S.cupGreen, S.cupGreenLiq] });
@@ -48,9 +48,9 @@ function setCamera(R, S) {
 function roundedRect(w, d, r) { const s = new THREE.Shape(), x = -w / 2, y = -d / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d); s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
 // 硅胶托盘（单位：1 格 = 1），顶面挖 2w×2 个圆孔 + 半球凹槽
 function tileGeo(R, S, w) {
-  const k = `tile_${w}_${S.tileRadius}_${S.bowlSize}_${S.tile3dThick}`; if (R.geos[k]) return R.geos[k];
+  const k = `tile_${w}_${S.tileRadius}_${S.bowlSize}_${S.tile3dThick}_${S.tileGap}_${S.cellW}`; if (R.geos[k]) return R.geos[k];
   // v1.2.1：倒角包含在外形内（外形 = w − 缝隙，与相邻托盘 / 外框不重叠），底面在 y=0（不陷进底板）
-  const bv = 0.03, gp = S.tileGap / S.cellW, W = w - gp - 2 * bv, D = 1 - gp - 2 * bv, r = Math.min(0.3, S.tileRadius / S.cellW), th = S.tile3dThick, br = 0.25 * S.bowlSize;
+  const bv = TILE_BEVEL, gp = S.tileGap / S.cellW, W = w - gp - 2 * bv, D = 1 - gp - 2 * bv, r = Math.min(0.3, S.tileRadius / S.cellW), th = S.tile3dThick, br = bowlRCell(S); // v1.2.2：br ≤ 顶面内留壁厚，孔不越界
   const sh = roundedRect(W, D, r), slots = [];
   for (let q = 0; q < 2; q++) for (let p = 0; p < w * 2; p++) { const x = (p + 0.5) * 0.5 - w / 2, y = (q + 0.5) * 0.5 - 0.5; slots.push([x, y]); const h = new THREE.Path(); h.absarc(x, y, br, 0, Math.PI * 2, true); sh.holes.push(h); }
   const body = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelSegments: 3, curveSegments: 16 }); body.rotateX(-Math.PI / 2); body.translate(0, bv, 0);

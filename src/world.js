@@ -5,6 +5,10 @@ import * as THREE from 'three';
 export const DW = 720, DH = 1280;
 const LANE0 = 530; // 最下车道（与 render.js LANES[0] 一致）
 export const easeIO = t => { t = t < 0 ? 0 : t > 1 ? 1 : t; return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+// 托盘倒角（格单位）与凹槽半径（格单位）。v1.2.2：凹槽圆必须完整落在顶面外形内（顶面外形 = 外形 − 倒角），
+// 否则 ExtrudeGeometry 的三角化会把越界的孔整个吞掉（v1.2.1：1 格托盘只剩 1–2 个凹槽、2 格托盘 6 个）
+export const TILE_BEVEL = 0.02, BOWL_WALL = 0.012;
+export const bowlRCell = S => Math.max(0.05, Math.min(0.25 * S.bowlSize, (1 - S.tileGap / S.cellW) / 2 - TILE_BEVEL - 0.25 - BOWL_WALL));
 export const clamp01 = t => t < 0 ? 0 : t > 1 ? 1 : t;
 
 export function makeCamera(S) {
@@ -39,10 +43,10 @@ export function createWorld(S, L) {
   W.cupTop = W.cupH + W.cupRim;
   W.cupGap = S.cupGap * k0; // 传送带上相邻杯子中心距（弦长）
   // 托盘（几何与 scene3d tileGeo 一致：底面在底板上，倒角包含在外形内）
-  W.tileBevel = 0.03; W.tileGapC = S.tileGap / S.cellW; // 格单位
+  W.tileBevel = TILE_BEVEL; W.tileGapC = S.tileGap / S.cellW; // 格单位
   W.tileTh = (S.tile3dThick + 2 * W.tileBevel) * C; // 托盘总厚（世界）
   W.tileHalfX = w => (w - W.tileGapC) / 2 * C; W.tileHalfZ = () => (1 - W.tileGapC) / 2 * CZ;
-  W.bowlR = 0.25 * S.bowlSize * C; W.bowlDepth = Math.min(0.25 * S.bowlSize * 0.8, S.tile3dThick * 0.8) * C;
+  W.bowlR = bowlRCell(S) * C; W.bowlDepth = Math.min(bowlRCell(S) * 0.8, S.tile3dThick * 0.8) * C;
   W.cupRest = W.tileTh - W.bowlDepth * Math.sqrt(Math.max(0, 1 - Math.pow(Math.min(0.999, W.cupRB / W.bowlR), 2))); // 杯底边缘贴住半球凹槽时杯底高度（相对托盘底面）
   // 凹槽中心（相对托盘中心，世界 dx, dz），顺序 = 参考落杯顺序：靠传送带的后排从左到右，再前排从左到右
   W.slots = w => { const o = []; for (let q = 0; q < 2; q++) for (let p = 0; p < w * 2; p++) o.push([((p + 0.5) * 0.5 - w / 2) * C, ((q + 0.5) * 0.5 - 0.5) * CZ]); return o; };

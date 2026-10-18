@@ -136,7 +136,8 @@ export function niceSprite(S, k) {
 export function sparkSprite(k) { const R = 40, c = mk(R * 2 * k, R * 2 * k), g = c.getContext('2d'); g.setTransform(k, 0, 0, k, R * k, R * k); const gr = g.createRadialGradient(0, 0, 0, 0, 0, R); gr.addColorStop(0, 'rgba(255,255,220,1)'); gr.addColorStop(0.3, 'rgba(255,240,150,0.6)'); gr.addColorStop(1, 'rgba(255,220,100,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, R, 0, 7); g.fill(); g.fillStyle = '#fff'; for (let i = 0; i < 4; i++) { g.rotate(Math.PI / 4); g.fillRect(-R, -1, R * 2, 2); } return { c, w: R * 2, h: R * 2, ax: R, ay: R }; }
 // ---------- 传送带（静态底图）+ 路径 ----------
 // 路径：从出口 (360, 出口y) 往回（队头 → 队尾）；车道 y 从下到上
-export const LANES = [520, 430, 345, 265, 190, 130, 75, 22, -30, -82];
+// 参考第 0 帧逐车道测量（杯底 y - 8）：车道间距 95→50 逐渐变小（透视曲线）
+export const LANES = [530, 436, 350, 271, 201, 137, 77, 27, -18, -60];
 export function beltPath(S, exitXY) {
   const pts = [], add = (x, y) => pts.push([x, y]);
   const [ex, ey] = exitXY;
@@ -144,27 +145,28 @@ export function beltPath(S, exitXY) {
   const seg = (x0, y0, x1, y1, n = 10) => { for (let i = 1; i <= n; i++) add(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n); };
   // 弯进最下车道
   const arc = (cx, cy, r, a0, a1, n = 12) => { for (let i = 1; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; add(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } };
-  arc(ex - 30, LANES[0] + 40, 30, 0, -Math.PI / 2, 8); // 到 (ex-30, LANES0+10)
-  let x = ex - 30, y = LANES[0] + 10, left = true;
+  arc(ex - 40, LANES[0] + 40, 40, 0, -Math.PI / 2, 12); // 参考：大半径弯道进入出口
+  let x = ex - 40, y = LANES[0], left = true;
   for (let i = 0; i < LANES.length - 1; i++) {
-    const yA = LANES[i], yB = LANES[i + 1], r = (yA - yB) / 2, xe = left ? 40 : 680;
+    const yA = LANES[i], yB = LANES[i + 1], r = (yA - yB) / 2, xe = left ? 32 : 688;
     seg(x, y, xe, yA, 24); x = xe; y = yA;
     arc(xe, (yA + yB) / 2, r, left ? Math.PI / 2 : Math.PI / 2, left ? 3 * Math.PI / 2 : -Math.PI / 2, 14);
     y = yB; left = !left;
     if (i === 0) { /* noop */ }
   }
-  seg(x, y, left ? 40 : 680, y, 24);
+  seg(x, y, left ? 32 : 688, y, 24);
   // 累计弧长
   const len = [0]; for (let i = 1; i < pts.length; i++) len.push(len[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
   const at = s => { if (s <= 0) return pts[0]; let i = 1; while (i < len.length && len[i] < s) i++; if (i >= len.length) return null; const u = (s - len[i - 1]) / (len[i] - len[i - 1]); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * u, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * u]; };
   return { pts, total: len[len.length - 1], at };
 }
 // 远近缩放：y 越小越远
-export const beltScale = y => 0.8 + 0.2 * Math.max(0, Math.min(1, (y + 80) / 680));
+// 参考测量：近处车道杯宽 34 / 间距 42，最远可见车道（y≈30）杯宽 25 / 间距 31 → 0.74
+export const beltScale = y => { const t = Math.max(-0.3, Math.min(1.15, (y + 20) / 560)); return 0.72 + 0.28 * (t < 0 ? t : Math.pow(t, 0.92)); };
 export function drawBelt(c, S, path, k) {
   const g = c.getContext('2d'); g.setTransform(k, 0, 0, k, 0, 0); g.lineCap = 'round'; g.lineJoin = 'round';
   const strokeAll = (wk, col, dy) => { for (let i = 1; i < path.pts.length; i++) { const a = path.pts[i - 1], b = path.pts[i]; g.strokeStyle = col; g.lineWidth = S.beltW * beltScale(b[1]) * wk; g.beginPath(); g.moveTo(a[0], a[1] + dy * beltScale(b[1])); g.lineTo(b[0], b[1] + dy * beltScale(b[1])); g.stroke(); } };
-  strokeAll(1.15, 'rgba(60,40,10,0.25)', 12); strokeAll(1.05, S.beltSide, 8); strokeAll(1, S.beltTop, 0); strokeAll(0.55, shade(S.beltTop, -0.08), 0);
+  strokeAll(1.18, 'rgba(60,40,10,0.28)', 16); strokeAll(1.08, S.beltSide, 12); strokeAll(1.08, shade(S.beltSide, 0.12), 6); strokeAll(1.04, shade(S.beltTop, 0.12), 0); strokeAll(0.86, S.beltSide, 1); strokeAll(0.8, S.beltTop, 1.5); strokeAll(0.4, shade(S.beltTop, -0.05), 1.5);
 }
 // ---------- 内置手 + 白色触控笔（笔尖在左上 = 锚点 0.05/0.05）----------
 export function defaultHand() {

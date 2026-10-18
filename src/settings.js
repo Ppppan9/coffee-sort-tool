@@ -1,5 +1,5 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -53,11 +53,11 @@ export const GROUPS = [
     ['cupCreamLiq', '咖啡杯：奶油液面', 'color', '#fff6d6'],
     ['cupGreen', '咖啡杯：绿杯身', 'color', '#8cc400'],
     ['cupGreenLiq', '咖啡杯：绿液面', 'color', '#d4f36a'],
-    ['cupSize', '咖啡杯大小(近处宽 px)', 'range', 39, 16, 60, 1],
-    ['beltTop', '传送带顶面色', 'color', '#aac0e7'],
-    ['beltSide', '传送带侧面色', 'color', '#4b6aa5'],
-    ['beltW', '传送带宽度(px)', 'range', 46, 20, 80, 1],
-    ['cupGap', '杯子间距(近处 px)', 'range', 40, 20, 70, 1],
+    ['cupSize', '咖啡杯大小(近处宽 px)', 'range', 34, 16, 60, 1],
+    ['beltTop', '传送带顶面色', 'color', '#93a9d6'],
+    ['beltSide', '传送带侧面色', 'color', '#34497e'],
+    ['beltW', '传送带宽度(px)', 'range', 54, 20, 80, 1],
+    ['cupGap', '杯子间距(近处 px)', 'range', 42, 20, 70, 1],
     ['counterShow', '显示杯数计数器', 'bool', true],
     ['counterStart', '计数器初始值', 'range', 999, 0, 9999, 1],
     ['counterLabel', '计数器文字', 'text', '咖啡杯数'],
@@ -165,6 +165,8 @@ export function migrate(obj) {
     mv('handImg', 'handImage'); mv('sfxVol', 'sfxVolume'); mv('sfx', 'sfxMute', x => !x); mv('recTail', 'tailSec', x => Math.round(x / 100) / 10); mv('endText', 'endTitle');
     v = 1;
   }
+  const OLD = { 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
+  for (const nv of Object.keys(OLD).map(Number).sort()) if (v < nv) { for (const k in OLD[nv]) if (s[k] === OLD[nv][k]) delete s[k]; v = nv; }
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];
   return out;

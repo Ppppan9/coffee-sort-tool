@@ -1,6 +1,6 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
 import { DEFAULT_HAND } from './default_hand.js';
-export const SETTINGS_VERSION = 6;
+export const SETTINGS_VERSION = 7;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -163,6 +163,7 @@ export const GROUPS = [
     ['pressDepth', '按压幅度（按下时手指缩小比例）', 'range', 0.07, 0, 0.3, 0.01],
     ['tapRipple', '点击处显示波纹圈（参考视频没有）', 'bool', false],
     ['handShow', '显示手指', 'bool', true],
+    ['hideCursor', '手指出现时隐藏鼠标', 'bool', true],
     ['handFollow', '托盘滑动时手指按住跟随（参考：拖动）', 'bool', true],
     ['autoMode', '自动通关方式', 'select', 'drag', [['drag', '拖动（手+笔尖按住托盘沿路径拖到出口/空格，参考）'], ['tap', '点击后托盘自动滑行（暂存仍用拖动）']]],
     ['autoStartDelay', '开始前等待(ms)', 'range', 400, 0, 5000, 50],
@@ -212,6 +213,7 @@ export function migrate(obj) {
   }
   const OLD = { 6: { boxLift: 110, boxGrow: 300, boxClose: 400, boxFlyDur: 400, cam3dPitch: 41, belt3dHeight: 10, light3dElev: 55, shadow3dOpacity: 0.28, mat3dTileClearcoat: 0.35, floorColor: '#aec6e9', frameColor: '#4a6aa8', colBrown: '#7e533b', colCream: '#f7e9b3', colGreen: '#c1f113', bgColor: '#e1c590', beltRail: '#9fb8e8', beltTop: '#93a9d6', beltSide: '#34497e', cupBrown: '#453027', cupCream: '#f1e3b4', cupGreen: '#8cc400' }, 5: { handSize: 0.34, handAnchorX: 0.05, handAnchorY: 0.05, handImage: '' }, 4: { handSize: 0.42 }, 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
   for (const nv of Object.keys(OLD).map(Number).sort()) if (v < nv) { for (const k in OLD[nv]) if (s[k] === OLD[nv][k]) delete s[k]; v = nv; }
+  if (v < 7) v = 7; // v7（v1.2.2）：新增 hideCursor（手指出现时隐藏鼠标，默认开）——只补默认
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];
   return out;

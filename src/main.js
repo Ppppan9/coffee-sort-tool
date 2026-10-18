@@ -275,6 +275,9 @@ function drawEnd(p, noDim) {
 function handScaleOf() { return hand.img ? S.handSize * DW / hand.img.width : 1; }
 const handHiddenByEnd = () => !S.endCardHand && endAlpha(now()) > 0;
 function handState() { if (!S.handShow || !hand.img || !hand.visible || handHiddenByEnd()) return null; return { x: hand.x, y: hand.y, s: handScaleOf() * (1 - S.pressDepth * hand.press) }; }
+// 手指出现在画面上时隐藏系统鼠标（与麻将/打螺丝统一：hideCursor）。手动：手指跟随指针（指尖锚点 = 指针位置）；自动通关：手指可见时
+function handCursorHidden() { return !!(S.hideCursor && S.handShow && hand.img && !handHiddenByEnd() && (!autoRunning || hand.visible)); }
+function updateCursor() { const c = handCursorHidden() ? 'none' : 'pointer'; if (cv.style.cursor !== c) cv.style.cursor = c; }
 
 // ---------- 交互 ----------
 function screenToBoard(x, y) { const p = Wd.un(x, y, Wd.FY + Wd.tileTh); return Wd.Binv(p.x, p.z); } // 屏幕 → 托盘顶面平面 → 格坐标（tileScreen 的精确逆）
@@ -455,6 +458,7 @@ async function doExport3D(save = true, r0 = curRec()) {
 
 // ---------- 主循环 ----------
 function loop(t) {
+  updateCursor();
   if (window.__vclock != null) { requestAnimationFrame(loop); return; } // 虚拟时钟：由 __game.renderAt 驱动
   step(t); updPress(t); draw(t);
   if (aeActive()) { if (recTailDone(t)) aeStop(); else aeRec.sample(t); if (t - (loop.aeBtnT || 0) > 250) { loop.aeBtnT = t; updateAEButtons(); } }
@@ -468,7 +472,7 @@ function applyChange(k) {
   if (k === 'shapeImg' && S.shapeImg) S.level = 'image';
   saveSettings(S);
   if (k === 'handImage' || k === 'handAnchorX' || k === 'handAnchorY') loadHand();
-  if (NEWGAME_KEYS.test(k)) newGame(); else if (L && !/^(sfx|auto|move|delay|think|jitter|hand|press|tap|rec|tail|ae|export3d|end|slide|cup(Interval|Fly)|box(Grow|Close|Fly)|niceDur|shake|mismatch)/.test(k) || /^(endTitle)$/.test(k)) rebuild();
+  if (NEWGAME_KEYS.test(k)) newGame(); else if (L && !/^(sfx|auto|move|delay|think|jitter|hand|hideCursor|press|tap|rec|tail|ae|export3d|end|slide|cup(Interval|Fly)|box(Grow|Close|Fly)|niceDur|shake|mismatch)/.test(k) || /^(endTitle)$/.test(k)) rebuild();
 }
 function loadHand() { const done2 = im => { hand.img = im; if (L) rebuild(); }; const im = new Image(); im.onload = () => done2(im); im.onerror = () => done2(defaultHand()); /* 默认 = 麻将工具同款手指 PNG */ im.src = S.handImage || DEFAULT_HAND; }
 function buildPanel() {

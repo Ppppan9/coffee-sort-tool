@@ -44,3 +44,8 @@
 - ✅ 截图：screenshots/clip_fix_before_after.jpg、cup_fill_ref_vs_tool.jpg、box_pack_ref_vs_tool_v121.jpg（棕色 5.50 s + 绿色 8 杯 26.25 s 全序列逐帧 + 合盖放大）
 - ✅ 测试（逐个）：test:logic / npm test / test:ae / test:ae3d / test:3d BLENDER PASS / test:drag / test:norec / test:shape / test:clip 全部 PASS
 - 差距：参考绿色 8 杯打包整体比棕色慢约 0.25 s，工具两者同一时长；AE 2D 合成 PSNR 平均 32.4（传送带头部缓动时快照与关键帧时间差导致带上杯子约 4px 误差，仅测试比较误差）
+
+## v1.2.2 凹槽缺失 + 手指/鼠标重叠（2026-10-19 02:00 UTC+8 起）
+- 用户截图 ref/user_missing_bowls.png（v1.2.1 3D）：1 格托盘只显示 1–2 个凹槽、2 格绿托盘 6 个。根因：v1.2.1 把倒角收进外形（W = w − 缝 − 2×倒角，顶面外形半宽 0.445 格），凹槽仍是 0.25×bowlSize(0.86)=0.215 格、中心 ±0.25 → 孔边 0.465 超出顶面外形，ExtrudeGeometry（earcut）三角化把越界的孔整个吞掉（顶面盖住凹槽）。
+- 修复：world.js 统一 TILE_BEVEL=0.02、bowlRCell(S)=min(0.25×bowlSize, 顶面半宽 − 0.25 − 壁厚 0.012)（默认 0.193 格，参考实测 ≈0.195）；scene3d tileGeo / world.bowlR / bowlDepth / 2D 精灵凹槽用同一半径。test:bowls（test/bowl-test.mjs：对页面实际托盘网格在每个凹槽中心 + 0.8R 圆周竖直射线，顶面不得有三角形、下方打到凹槽；2D 精灵数量）：修复前 1 格 1/4、2 格 6/8 → 修复后 4/4、8/8（参考关 + 随机 42 宽托盘 30%）。screenshots/bowls_fix_before_after.jpg。
+- 手指/鼠标：手动游玩手指跟随指针时画布仍是 cursor:pointer → 两者同时出现。新增 hideCursor「手指出现时隐藏鼠标」（默认开，settings v7 只补默认）：手指显示在画面上（手动跟随 / 拖动含指针捕获 / 自动通关手指可见）时画布 cursor:none，面板保持鼠标，结束页隐藏手指或关闭显示手指时恢复 pointer。test:cursor。

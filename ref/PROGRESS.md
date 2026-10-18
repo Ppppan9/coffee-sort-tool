@@ -16,5 +16,10 @@
 - (a) ✅ 杯子尺寸/间距 + 传送带车道 y 与透视曲线按参考第 0 帧测量（render.js LANES / beltScale；设置 v2 migrate：cupSize 34、cupGap 42、beltW 54、传送带配色）
 - (b) ✅ 拖动：level.js slideAxis（连续碰撞）/ reachCells / applyPark / isGoal / solvePlan（需要时暂存，迭代加深 1..3 次暂存）；main.js dragBegin/dragMove/dragEnd（拐角吸附 dragAssist，松手吸附格子，拖进出口送出，颜色不符抖动），设置 inputMode（both/drag/tap）、autoMode（drag/tap）；自动通关用 autoDrag（笔尖按住托盘沿路径拖动）；test:drag
 - (c) ✅ 纸箱：箱体 + 四片翻盖连续翻折（render.js boxBodySprite/boxFlapSprite，main.js boxAt；侧盖先合、前后盖后合），升起 boxLift、放大 boxScale；Nice 在纸箱飞走时出现（niceAt）+ 金色星星粒子（sparkCount/sparkSize，每颗星是独立图层 → AE/3D 自动关键帧）；设置 v3
-- (d) 🟡 three.js 页面渲染已接入（src/three/scene3d.js：create3D/setup/render；main.js draw() 合成：2D 沙地 → 3D → 2D 覆盖层；设置组“3D 渲染”render3d/cam3d*/light3d*/shadow3d*/mat3d*）。待做：对比参考调相机/配色、纸箱 3D 视觉核对、性能
-- 下一步：(d) 收尾 three.js 页面渲染 → (e) 导出 + 全部测试 → (f) v1.1 推送
+- (d) ✅ three.js 页面实时 3D（src/three/scene3d.js；杯子 InstancedMesh；托盘挖孔+半球凹槽；纸箱四片铰链翻盖；阴影）；设置组“3D 渲染”
+- (e) ✅ 全部测试通过：test:logic（含暂存）/ npm test（67 托盘）/ test:shape / test:norec / test:drag / test:ae（PSNR≈33–37）/ test:3d（BLENDER PASS）。盒子无 GPU（SwiftShader 3D≈2fps），长流程测试切 2D（R3D=1 保持 3D），npm test 先校验 3D 场景
+- 手指：按用户要求改为麻将工具同款默认手指 PNG（src/default_hand.js，handRotation/handFlip/锚点与麻将一致，settings v5 migrate；可上传覆盖）
+- (f) v1.1.0 推送 + Pages 验证
+## 剩余差距
+- AE 导出仍用 2D 精灵 PNG（非 3D 渲染图）；3D 导出（glTF/FBX）沿用原导出模型 + 纸箱翻盖/星星为关键帧四边形，尚未复用页面 three.js 模型（可用 GLTFExporter 接入）
+- 3D 相机/传送带颜色仅近似参考；纸箱 2D 精灵的翻盖为投影缩放近似

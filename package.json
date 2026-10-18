@@ -9,6 +9,7 @@
     "test:logic": "node test/logic-test.mjs",
     "test:ae": "node test/ae-export.mjs && node test/ae-mock.mjs /workspace/coffee_ae_sample.zip && node test/ae-composite.mjs",
     "test:3d": "E3D=1 node test/ae-export.mjs && bash test/export3d-blender.sh",
+    "test:shape": "node test/shape-test.mjs",
     "test:norec": "node test/no-autorec.mjs"
   },
   "repository": { "type": "git", "url": "git+https://github.com/Ppppan9/coffee-sort-tool.git" },

@@ -68,11 +68,16 @@ export function tileSprite(S, color, w, h, k, opts = {}) {
   const slots = slotPositions(S, w, h);
   const br = Math.min(CW, CH) / 4 * S.bowlSize;
   for (const [sx, sy] of slots) {
-    const x = sx + W / 2, y = sy + H / 2, d = S.bowlDepth;
-    const bg = g.createRadialGradient(x, y + br * 0.45, br * 0.1, x, y, br);
-    bg.addColorStop(0, shade(base, 0.18 * d)); bg.addColorStop(0.65, shade(base, -0.05 * d)); bg.addColorStop(1, shade(base, -0.38 * d));
-    g.fillStyle = bg; g.beginPath(); g.ellipse(x, y, br, br * CH / CW * 1.02, 0, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = shade(base, 0.3 * d); g.lineWidth = 1; g.beginPath(); g.ellipse(x, y + 0.6, br, br * CH / CW, 0, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+    const x = sx + W / 2, y = sy + H / 2, d = S.bowlDepth, ry = br * CH / CW * 1.02;
+    // 凹陷半球：上半部分背光（暗），下半部分受光（亮），边缘一圈细高光
+    g.save(); g.beginPath(); g.ellipse(x, y, br, ry, 0, 0, Math.PI * 2); g.clip();
+    const bg = g.createLinearGradient(0, y - ry, 0, y + ry);
+    bg.addColorStop(0, shade(base, -0.42 * d)); bg.addColorStop(0.45, shade(base, -0.16 * d)); bg.addColorStop(1, shade(base, 0.16 * d));
+    g.fillStyle = bg; g.fillRect(x - br, y - ry, br * 2, ry * 2);
+    const hl = g.createRadialGradient(x, y + ry * 0.55, br * 0.1, x, y + ry * 0.4, br * 0.9); hl.addColorStop(0, `rgba(255,255,255,${0.18 * d})`); hl.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = hl; g.fillRect(x - br, y - ry, br * 2, ry * 2);
+    g.restore();
+    g.strokeStyle = shade(base, -0.3 * d); g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, br, ry, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+    g.strokeStyle = shade(base, 0.4 * d); g.lineWidth = 1.3; g.beginPath(); g.ellipse(x, y + 0.5, br, ry, 0, Math.PI * 0.1, Math.PI * 0.9); g.stroke();
   }
   return { c, w: W + pad * 2, h: H + th + pad * 2, ax: (W / 2 + pad), ay: (H / 2 + pad) }; // 锚点 = 顶面中心
 }
@@ -155,7 +160,7 @@ export function beltPath(S, exitXY) {
   return { pts, total: len[len.length - 1], at };
 }
 // 远近缩放：y 越小越远
-export const beltScale = y => 0.74 + 0.26 * Math.max(0, Math.min(1, (y + 80) / 680));
+export const beltScale = y => 0.8 + 0.2 * Math.max(0, Math.min(1, (y + 80) / 680));
 export function drawBelt(c, S, path, k) {
   const g = c.getContext('2d'); g.setTransform(k, 0, 0, k, 0, 0); g.lineCap = 'round'; g.lineJoin = 'round';
   const strokeAll = (wk, col, dy) => { for (let i = 1; i < path.pts.length; i++) { const a = path.pts[i - 1], b = path.pts[i]; g.strokeStyle = col; g.lineWidth = S.beltW * beltScale(b[1]) * wk; g.beginPath(); g.moveTo(a[0], a[1] + dy * beltScale(b[1])); g.lineTo(b[0], b[1] + dy * beltScale(b[1])); g.stroke(); } };

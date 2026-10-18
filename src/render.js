@@ -185,3 +185,35 @@ export function defaultHand() {
   g.fillStyle = 'rgba(255,230,215,0.8)'; g.beginPath(); g.ellipse(100, 174, 9, 6, -0.6, 0, 7); g.fill();
   return c;
 }
+// ---------- 纸箱（v1.1：箱体 + 四片翻盖，翻盖绕折线连续翻折）----------
+// 箱口 = 托盘占地（宽 W、透视深 D），箱体正面高 H；锚点约定见各函数
+export function boxDims(S, w) { return { W: w * S.cellW * 0.98, D: S.cellH * 0.98, H: S.cellH * 0.62 }; }
+const KR = { face: '#d9a466', side: '#c48b4e', in: '#8a5a2c', flapOut: '#e8b878', flapIn: '#b07a42', edge: '#a8723c' };
+// 箱体：箱口内部（暗）+ 正面；锚点 = 箱口中心
+export function boxBodySprite(S, w, k) {
+  const { W, D, H } = boxDims(S, w), pad = 4, c = mk((W + pad * 2) * k, (D + H + pad * 2) * k), g = c.getContext('2d');
+  g.setTransform(k, 0, 0, k, pad * k, pad * k);
+  g.fillStyle = KR.in; g.fillRect(0, 0, W, D); // 箱内
+  const gi = g.createLinearGradient(0, 0, 0, D); gi.addColorStop(0, 'rgba(0,0,0,0.35)'); gi.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gi; g.fillRect(0, 0, W, D);
+  const gf = g.createLinearGradient(0, D, 0, D + H); gf.addColorStop(0, shade(KR.face, 0.08)); gf.addColorStop(1, shade(KR.face, -0.12)); g.fillStyle = gf; g.fillRect(0, D, W, H);
+  g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, D, W, 2); g.fillStyle = KR.edge; g.fillRect(0, D + H - 3, W, 3);
+  g.strokeStyle = 'rgba(120,70,30,0.35)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, W - 1, D + H - 1);
+  return { c, w: W + pad * 2, h: D + H + pad * 2, ax: W / 2 + pad, ay: D / 2 + pad };
+}
+// 翻盖：kind 'side'（宽 W/2，高 D，锚点=左边折线中点，向右合上）/ 'fb'（宽 W，高 D/2，锚点=上边折线中点，向下合上）；face 'out' 外侧亮 / 'in' 内侧暗
+export function boxFlapSprite(S, w, k, kind, face) {
+  const { W, D } = boxDims(S, w), fw = kind === 'side' ? W / 2 : W, fh = kind === 'side' ? D : D / 2, pad = 2;
+  const c = mk((fw + pad * 2) * k, (fh + pad * 2) * k), g = c.getContext('2d'); g.setTransform(k, 0, 0, k, pad * k, pad * k);
+  const base = face === 'out' ? KR.flapOut : KR.flapIn, gr = kind === 'side' ? g.createLinearGradient(0, 0, fw, 0) : g.createLinearGradient(0, 0, 0, fh);
+  gr.addColorStop(0, shade(base, -0.1)); gr.addColorStop(1, shade(base, 0.06)); g.fillStyle = gr; g.fillRect(0, 0, fw, fh);
+  g.strokeStyle = 'rgba(110,65,25,0.45)'; g.lineWidth = 1.2; g.strokeRect(0.6, 0.6, fw - 1.2, fh - 1.2);
+  if (face === 'out' && kind === 'fb') { g.fillStyle = 'rgba(255,240,205,0.35)'; g.fillRect(fw * 0.4, 0, fw * 0.2, fh); }
+  return { c, w: fw + pad * 2, h: fh + pad * 2, ax: kind === 'side' ? pad : fw / 2 + pad, ay: kind === 'side' ? fh / 2 + pad : pad };
+}
+// 闪光星星粒子（参考 Nice 出现时的金色十字星）
+export function starSprite(k) {
+  const R = 16, c = mk(R * 2 * k, R * 2 * k), g = c.getContext('2d'); g.setTransform(k, 0, 0, k, R * k, R * k);
+  const gr = g.createRadialGradient(0, 0, 0, 0, 0, R); gr.addColorStop(0, 'rgba(255,255,235,1)'); gr.addColorStop(0.35, 'rgba(255,225,90,0.95)'); gr.addColorStop(1, 'rgba(255,190,40,0)');
+  g.fillStyle = gr; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? R * 0.28 : R; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.fill();
+  return { c, w: R * 2, h: R * 2, ax: R, ay: R };
+}

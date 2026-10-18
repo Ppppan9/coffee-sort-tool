@@ -1,5 +1,5 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -73,9 +73,14 @@ export const GROUPS = [
     ['cupInterval', '落杯间隔(ms，参考≈200)', 'range', 200, 30, 800, 10],
     ['cupFly', '落杯时长(ms，参考≈150)', 'range', 150, 30, 800, 10],
     ['boxGrow', '纸箱出现(ms)', 'range', 300, 50, 1500, 10],
-    ['boxClose', '纸箱合盖(ms)', 'range', 450, 50, 1500, 10],
+    ['boxClose', '纸箱合盖(ms，参考≈400)', 'range', 400, 50, 1500, 10],
     ['boxFlyDur', '纸箱飞走(ms，参考≈400)', 'range', 400, 100, 2000, 10],
-    ['niceDur', '“Nice”显示(ms)', 'range', 800, 0, 3000, 10],
+    ['boxScale', '纸箱大小(×托盘，参考≈1.6)', 'range', 1.6, 0.8, 2.5, 0.01],
+    ['boxLift', '纸箱升起高度(px，参考≈110)', 'range', 110, 0, 300, 1],
+    ['niceAt', '“Nice”出现时机', 'select', 'fly', [['fly', '纸箱合好开始飞走时（参考）'], ['done', '纸箱飞到计数器后']]],
+    ['sparkCount', 'Nice 闪光星星数量', 'range', 10, 0, 40, 1],
+    ['sparkSize', 'Nice 闪光星星大小', 'range', 1, 0.2, 3, 0.05],
+    ['niceDur', '“Nice”显示(ms，参考≈700)', 'range', 700, 0, 3000, 10],
     ['shakeDur', '被挡抖动(ms)', 'range', 360, 50, 1500, 10],
     ['shakeAmp', '抖动幅度(px)', 'range', 7, 0, 30, 0.5],
     ['pressScale', '点击按下托盘缩小', 'range', 0.06, 0, 0.3, 0.01],
@@ -168,7 +173,7 @@ export function migrate(obj) {
     mv('handImg', 'handImage'); mv('sfxVol', 'sfxVolume'); mv('sfx', 'sfxMute', x => !x); mv('recTail', 'tailSec', x => Math.round(x / 100) / 10); mv('endText', 'endTitle');
     v = 1;
   }
-  const OLD = { 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
+  const OLD = { 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
   for (const nv of Object.keys(OLD).map(Number).sort()) if (v < nv) { for (const k in OLD[nv]) if (s[k] === OLD[nv][k]) delete s[k]; v = nv; }
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];

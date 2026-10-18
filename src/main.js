@@ -1,6 +1,6 @@
 import { levelFromLayout, REF_LAYOUT, generateLevel, initState, canSend, applySend, done, stuck, solve, solvePlan, slideAxis, isGoal, applyPark, reachCells, capacity, frontColor, maskFromAlpha, connectMask, planQueue } from './level.js';
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID } from './settings.js';
-import { DW, DH, mk, boardGeo, drawBackground, drawBoard, tileSprite, slotPositions, cupSprite, boxSprite, counterSprite, niceSprite, sparkSprite, starSprite, boxBodySprite, boxFlapSprite, boxDims, beltPath, beltScale, drawBelt, defaultHand, tileColor } from './render.js';
+import { DW, DH, mk, boardGeo, drawBackground, drawBoard, tileSprite, slotPositions, cupSprite, boxSprite, counterSprite, niceSprite, sparkSprite, starSprite, boxBodySprite, boxFrontSprite, boxFlapSprite, boxDims, beltPath, beltScale, drawBelt, defaultHand, tileColor } from './render.js';
 import { Sfx } from './audio.js';
 import { DEFAULT_HAND } from './default_hand.js';
 import { create3D, IS3D } from './three/scene3d.js';
@@ -10,7 +10,7 @@ import { export3D } from './export3d/export3d.js';
 let S = loadSettings(); let r3d = null;
 const cv = document.getElementById('stage'); let ctx = cv.getContext('2d');
 const sfx = new Sfx();
-const now = () => performance.now();
+const now = () => window.__vclock != null ? window.__vclock : performance.now(); // 测试用虚拟时钟（逐帧对比）
 const clamp01 = t => t < 0 ? 0 : t > 1 ? 1 : t;
 const ease = t => 1 - Math.pow(1 - clamp01(t), 3), easeIO = t => { t = clamp01(t); return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
 const backOut = t => { t = clamp01(t); const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
@@ -73,7 +73,7 @@ function rebuild() {
   for (const col of ['brown', 'cream', 'green']) for (const w of [1, 2]) { A[`tile_${col}_${w}`] = tileSprite(S, col, w, 1, k * 1.25); A[`tile_${col}_${w}_flash`] = tileSprite(S, col, w, 1, k * 1.25, { flash: true }); A[`cup_${col}`] = cupSprite(S, col, k * 1.4); }
   for (const w of [1, 2]) { A[`box_open_${w}`] = boxSprite(S, w, k * 1.25, false); A[`box_closed_${w}`] = boxSprite(S, w, k * 1.25, true); }
   A.nice = niceSprite(S, k * 1.25); A.spark = sparkSprite(k); A.star = starSprite(k * 1.5);
-  for (const w of [1, 2]) { A[`boxbody_${w}`] = boxBodySprite(S, w, k * 1.25); for (const kd of ['side', 'fb']) for (const f of ['out', 'in']) A[`boxflap_${kd}_${f}_${w}`] = boxFlapSprite(S, w, k * 1.25, kd, f); }
+  for (const w of [1, 2]) { A[`boxbody_${w}`] = boxBodySprite(S, w, k * 1.25); A[`boxfront_${w}`] = boxFrontSprite(S, w, k * 1.25); for (const kd of ['side', 'fb']) for (const f of ['out', 'in']) A[`boxflap_${kd}_${f}_${w}`] = boxFlapSprite(S, w, k * 1.25, kd, f); }
   A.counterCache = new Map();
   { const c = mk(DW * k, DH * k); withCtx(c.getContext('2d'), () => { ctx.setTransform(k, 0, 0, k, 0, 0); drawTexts(); }); A.disclaimer = { c, w: DW, h: DH, ax: 0, ay: 0 }; }
   { const c = mk(DW * k, DH * k); withCtx(c.getContext('2d'), () => { ctx.setTransform(k, 0, 0, k, 0, 0); drawEnd(1); }); A.end_card = { c, w: DW, h: DH, ax: 0, ay: 0 }; }
@@ -141,7 +141,7 @@ function step(t) {
 // ---------- 场景（每帧精灵列表；画布绘制 / AE / 3D 同源）----------
 // item: {id, asset, x, y, sx, sy, rot, op, z}
 function scene(t) {
-  const out = [], add = (id, asset, x, y, o = {}) => out.push({ id, asset, x, y, sx: o.sx ?? 1, sy: o.sy ?? o.sx ?? 1, rot: o.rot || 0, op: o.op ?? 1, z: o.z ?? 0 });
+  const out = [], add = (id, asset, x, y, o = {}) => out.push({ id, asset, x, y, sx: o.sx ?? 1, sy: o.sy ?? o.sx ?? 1, rot: o.rot || 0, op: o.op ?? 1, z: o.z ?? 0, lift: o.lift || 0 }); // lift：屏幕上相对出口的升起量(px)，3D 里换算为真实高度
   add('background', 'background', 0, 0, { z: 0 }); add('belt', 'belt', 0, 0, { z: 1 });
   // 传送带上的杯子
   const gap = S.cupGap / (0.74 + 0.26) * 1.0;
@@ -178,40 +178,51 @@ function scene(t) {
   // 纸箱：grow = 杯子随托盘升起、箱体从下长出（翻盖竖起张开）；close = 侧盖先合、前后盖后合（连续翻折）；fly = 合好的箱子飞向计数器
   const { D: BD, H: BH } = boxDims(S, 1);
   const boxAt = (j, bw, x, y, s, thSide, thFB, grow, op, z) => {
-    const id = 'box_' + j.i, sx = dsx * s * S.boxScale, sy = dsy * s * S.boxScale, add2 = (n, asset, dx, dy, o) => add(id + n, asset, x + dx * sx, y + dy * sy, { z: z + (o.dz || 0), op, sx: sx * (o.sx ?? 1), sy: sy * (o.sy ?? 1) });
+    const id = 'box_' + j.i, sx = dsx * s, sy = dsy * s, lf = dockXY[1] - y, add2 = (n, asset, dx, dy, o) => add(id + n, asset, x + dx * sx, y + dy * sy, { z: z + (o.dz || 0), op, sx: sx * (o.sx ?? 1), sy: sy * (o.sy ?? 1), lift: lf });
     const W = boxDims(S, bw).W, D = BD;
-    add2('_body', `boxbody_${bw}`, 0, 0, { sy: 1, dz: 0 }); out[out.length - 1].meta = { w: bw, W: W * sx, D: D * sx, H: BH * sx * grow, thS: thSide, thF: thFB, lift: 0 };
+    add2('_body', `boxbody_${bw}`, 0, 0, { sy: 1, dz: 0 }); out[out.length - 1].meta = { w: bw, W: W * sx, D: D * sx, H: BH * sx * grow, grow, thS: thSide, thF: thFB, lift: lf };
+    add2('_front', `boxfront_${bw}`, 0, D / 2, { sy: Math.max(0.01, grow), dz: 0.001 }); // 正面（随出现进度向下长出）
     const fl = (th, kind, n, dx, dy, dir, dz) => { const c = Math.cos(th), f = c >= 0 ? 'out' : 'in', proj = c >= 0 ? c : c * (kind === 'fb' ? 1.7 : 1); add2(n, `boxflap_${kind}_${f}_${bw}`, dx, dy, kind === 'side' ? { sx: proj * dir, dz } : { sy: proj * dir, dz }); };
     // 背盖、左右盖、前盖（合上时前盖最上层）
-    fl(thFB, 'fb', '_flapB', 0 - W / 2 * 0, -D / 2, 1, 0.003);
-    fl(thSide, 'side', '_flapL', -W / 2, 0, 1, 0.004); fl(thSide, 'side', '_flapR', W / 2, 0, -1, 0.004);
-    fl(thFB, 'fb', '_flapF', 0, D / 2, -1, 0.005);
+    fl(thFB, 'fb', '_flapB', 0, -D / 2, 1, 0.003); fl(thFB, 'fb', '_flapF', 0, D / 2, -1, 0.004); // 参考：前后盖先合
+    fl(thSide, 'side', '_flapL', -W / 2, 0, 1, 0.005); fl(thSide, 'side', '_flapR', W / 2, 0, -1, 0.005); // 左右盖后合、盖在最上（中缝竖直）
   };
+  // v1.2 纸箱时序（按参考 5.47–6.85 s 逐帧对比）：grow = 托盘连同杯子升起（前 42%）→ 箱体出现、四片翻盖从竖直翻到完全摊平并放大到 boxScale（后段）；
+  // close = 前后盖先合（0–66%），左右盖后合（29–100%，最后盖在最上，中缝竖直）+ 轻微回弹；fly = 合好的箱子向右飞出画面（经过计数器后方）
+  const PI = Math.PI;
   for (const j of jobs) {
     if (!(j.ph === 'fill' || j.ph === 'grow' || j.ph === 'close' || j.ph === 'slide')) continue;
-    const tile = st.tiles[j.i], bw = tile.w; let lift = 0, z = 49;
-    const OPEN = 2.35;
-    const bsc = j.ph === 'grow' ? 1 + (S.boxScale - 1) * ease((t - j.t1) / S.boxGrow) : j.ph === 'close' ? S.boxScale : 1;
-    if (j.ph === 'grow') { const p = ease((t - j.t1) / S.boxGrow); lift = p * S.boxLift; boxAt(j, bw, dockXY[0], dockXY[1] - lift, 1, OPEN * p + (1 - p) * 1.6, OPEN * p + (1 - p) * 1.6, p, Math.min(1, p * 3), z); }
-    if (j.ph === 'close') {
-      const p = clamp01((t - j.t1) / S.boxClose); lift = S.boxLift;
-      const ps = easeIO(clamp01((p - 0.05) / 0.55)), pf = easeIO(clamp01((p - 0.4) / 0.55));
-      boxAt(j, bw, dockXY[0], dockXY[1] - lift, 1 + 0.05 * Math.sin(Math.PI * clamp01((p - 0.85) / 0.15)), OPEN * (1 - ps), OPEN * (1 - pf), 1, 1, z);
+    const tile = st.tiles[j.i], bw = tile.w; let lift = 0, z = 49, bsc = 1;
+    if (j.ph === 'grow') {
+      // 参考：5.47→5.90 s 托盘+杯子升起（ease-out，悬空）；5.80 s 纸箱从出口长出（正面一直到出口）；5.80→6.03 s 放大 + 翻盖摊平；6.03→6.10 停顿
+      const p = clamp01((t - j.t1) / S.boxGrow), pl = 1 - Math.pow(1 - clamp01(p / 0.65), 4), pb = clamp01((p - 0.55) / 0.06), po = easeIO((p - 0.55) / 0.38);
+      lift = pl * S.boxLift; bsc = 1 + (S.boxScale - 1) * po;
+      if (pb > 0) boxAt(j, bw, dockXY[0], dockXY[1] - lift, bsc, PI * 0.72 + PI * 0.28 * po, PI * 0.72 + PI * 0.28 * po, pb, 1, z);
     }
-    for (const [q, c] of vis.inTile) if (c.job === j) { const cs = beltScale(dockXY[1]) * 0.85; add('cup_' + q, 'cup_' + L.queue[q], dockXY[0] + c.slot[0] * dsx * bsc, dockXY[1] + (c.slot[1] * dsy + S.cupSize * 0.38) * bsc - lift, { sx: cs * bsc, sy: bsc * (j.ph === 'close' ? cs * (1 - 0.5 * clamp01(((t - j.t1) / S.boxClose - 0.4) / 0.5)) : cs), z: 49.001 + (c.slot[1] + 50) / 100000 }); }
+    if (j.ph === 'close') {
+      const p = clamp01((t - j.t1) / S.boxClose); lift = S.boxLift; bsc = S.boxScale;
+      const pf = easeIO(p / 0.66), ps = easeIO((p - 0.29) / 0.71), bump = 1 + 0.05 * Math.sin(PI * clamp01((p - 0.86) / 0.14));
+      boxAt(j, bw, dockXY[0], dockXY[1] - lift, bsc * bump, PI * (1 - ps), PI * (1 - pf), 1, 1, z);
+    }
+    bsc = 1; // 参考：托盘与杯子升起时不放大，纸箱在其外围放大
+    if (j.ph === 'grow' || j.ph === 'close') { // 托盘随杯子一起升起（在箱内）
+      const [tx, ty] = dockXY, tid = 'tile_' + String(j.i + 1).padStart(2, '0');
+      add(tid, `tile_${tile.color}_${tile.w}`, tx, ty - lift, { sx: dsx * bsc, sy: dsy * bsc, z: 49.0005, lift });
+    }
+    for (const [q, c] of vis.inTile) if (c.job === j) { const cs = beltScale(dockXY[1]) * 0.85; add('cup_' + q, 'cup_' + L.queue[q], dockXY[0] + c.slot[0] * dsx * bsc, dockXY[1] + (c.slot[1] * dsy + S.cupSize * 0.38) * bsc - lift, { sx: cs * bsc, sy: cs * bsc, z: 49.001 + (c.slot[1] + 50) / 100000, lift }); }
   }
   for (const j of jobs) {
     if (j.ph !== 'fly') continue; const bw = st.tiles[j.i].w;
-    const p = clamp01((t - j.t1) / S.boxFlyDur), e = easeIO(p), x0 = dockXY[0], y0 = dockXY[1] - S.boxLift, x1 = S.counterX + 113, y1 = S.counterY + 30;
-    const x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e - Math.sin(Math.PI * e) * 70;
-    boxAt(j, bw, x, y, 1 - 0.45 * e, 0, 0, 1, p > 0.75 ? (1 - p) * 4 : 1, 60);
+    const p = clamp01((t - j.t1) / S.boxFlyDur), x0 = dockXY[0], y0 = dockXY[1] - S.boxLift;
+    if (S.boxFlyTo === 'counter') { const e = easeIO(p), x1 = S.counterX + 113, y1 = S.counterY + 30, x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e - Math.sin(PI * e) * 70; boxAt(j, bw, x, y, S.boxScale * (1 - 0.45 * e), 0, 0, 1, p > 0.75 ? (1 - p) * 4 : 1, 60); }
+    else { const e = Math.pow(p, 1.5), x = x0 + (DW + 160 - x0) * e, y = y0 - 18 * Math.sin(PI * p * 0.5); boxAt(j, bw, x, y, S.boxScale, 0, 0, 1, 1, 60); }
   }
   // Nice 闪光粒子：中心白色光晕 + 金色星星向外飞散（参考 6.5–7.1 s）
-  vis.nices.forEach(n => { const p = (t - n.t0) / Math.max(1, S.niceDur), nx = S.counterX + 8, ny = S.counterY - 10; if (p >= 1 || !S.sparkCount) return;
+  vis.nices.forEach(n => { const p = (t - n.t0) / Math.max(1, S.niceDur), nx = S.niceX, ny = S.niceY; if (p >= 1 || !S.sparkCount) return;
     for (let k = 0; k < S.sparkCount; k++) { const a = (k / S.sparkCount) * Math.PI * 2 + 0.4 * Math.sin(k * 7.3), sp = 60 + 50 * ((k * 37) % 10) / 10, d = sp * ease(p * 1.3), tw = Math.sin(Math.PI * clamp01(p * 1.4 - (k % 3) * 0.08)); if (tw <= 0) continue;
       add('star_' + Math.round(n.t0) + '_' + k, 'star', nx + Math.cos(a) * d * 1.4, ny + Math.sin(a) * d * 0.8, { sx: (0.5 + 0.5 * ((k * 13) % 7) / 7) * (0.6 + 0.6 * tw) * S.sparkSize, rot: p * 2 + k, op: tw, z: 82 }); } });
   if (S.counterShow) { const n = Math.max(0, S.counterStart - vis.landed); add('counter', counterAsset(n), S.counterX, S.counterY, { z: 70 }); }
-  vis.nices.forEach((n, k) => { const p = (t - n.t0) / Math.max(1, S.niceDur), s = backOut(p * 2.6) * (p > 0.75 ? 1 + (p - 0.75) * 0.4 : 1), op = p > 0.75 ? 1 - (p - 0.75) * 4 : 1; const nx = S.counterX + 8, ny = S.counterY - 10; add('nice_' + Math.round(n.t0), 'nice', nx, ny, { sx: s, z: 80, op: Math.max(0, op) }); add('spark_' + Math.round(n.t0), 'spark', nx + 70, ny - 20, { sx: 0.6 + p * 1.6, z: 81, op: Math.max(0, 1 - p * 1.3), rot: p * 1.2 }); });
+  vis.nices.forEach((n, k) => { const p = (t - n.t0) / Math.max(1, S.niceDur), s = S.niceScale * backOut(p * 4.5) * (p > 0.75 ? 1 + (p - 0.75) * 0.4 : 1), op = p > 0.75 ? 1 - (p - 0.75) * 4 : 1; const nx = S.niceX, ny = S.niceY; add('nice_' + Math.round(n.t0), 'nice', nx, ny, { sx: s, z: 80, op: Math.max(0, op) }); add('spark_' + Math.round(n.t0), 'spark', DW / 2, dockXY[1] - S.boxLift - 10, /* 参考：纸箱合好处的白色闪光 */ { sx: 1.2 + p * 2.2, z: 81, op: Math.max(0, 1 - p * 2.2), rot: p * 1.2 }); });
   if (S.discShow) add('disclaimer', 'disclaimer', 0, 0, { z: 90 });
   const ea = endAlpha(t); if (ea > 0) add('end_card', 'end_card', 0, 0, { z: 95, op: ea });
   const hs = handState(); if (hs) add('hand', 'hand', hs.x, hs.y, { sx: hs.s * (S.handFlip ? -1 : 1), sy: hs.s, rot: S.handRotation * Math.PI / 180, z: 100 });
@@ -430,6 +441,7 @@ async function doExport3D(save = true, r0 = curRec()) {
 
 // ---------- 主循环 ----------
 function loop(t) {
+  if (window.__vclock != null) { requestAnimationFrame(loop); return; } // 虚拟时钟：由 __game.renderAt 驱动
   step(t); updPress(t); draw(t);
   if (aeActive()) { if (recTailDone(t)) aeStop(); else aeRec.sample(t); if (t - (loop.aeBtnT || 0) > 250) { loop.aeBtnT = t; updateAEButtons(); } }
   document.getElementById('recInfo').textContent = rec ? `录制中 ${((t - recT0) / 1000).toFixed(1)}s` : '';
@@ -486,6 +498,6 @@ document.getElementById('btnExport').onclick = () => { const a = document.create
 document.getElementById('btnImport').onclick = () => document.getElementById('importFile').click();
 document.getElementById('importFile').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { const j = JSON.parse(t); S = migrate(j); saveSettings(S); buildPanel(); loadHand(); newGame(); toast('已导入设置'); }).catch(() => toast('导入失败')); };
 document.getElementById('btnReset').onclick = () => { if (!confirm('恢复全部默认设置？')) return; S = { ...DEFS }; saveSettings(S); buildPanel(); loadHand(); newGame(); };
-window.__game = { autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, get r3d() { return r3d; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), dragBegin, dragMove, dragEnd, get drag() { return drag; }, get hand() { return hand; }, solvePlanNow: () => solvePlan(L, st), screenToBoard: (x, y) => screenToBoard(x, y), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
+window.__game = { renderAt: t => { window.__vclock = t; step(t); updPress(t); draw(t); }, autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, get r3d() { return r3d; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), dragBegin, dragMove, dragEnd, get drag() { return drag; }, get hand() { return hand; }, solvePlanNow: () => solvePlan(L, st), screenToBoard: (x, y) => screenToBoard(x, y), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
 buildPanel(); loadHand(); newGame();
 requestAnimationFrame(loop);

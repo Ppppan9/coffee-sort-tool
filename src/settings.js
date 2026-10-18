@@ -71,6 +71,9 @@ export const GROUPS = [
     ['counterY', '计数器 Y', 'range', 440, 0, 1200, 1],
     ['niceText', '完成提示文字', 'text', 'Nice'],
     ['niceColor', '完成提示颜色', 'color', '#3ee81c'],
+    ['niceX', '“Nice”中心 X(参考≈375)', 'range', 375, 0, 720, 1],
+    ['niceY', '“Nice”中心 Y(参考≈428)', 'range', 428, 0, 1280, 1],
+    ['niceScale', '“Nice”大小(参考≈1.4)', 'range', 1.4, 0.3, 3, 0.01],
   ]],
   ['3D 渲染（three.js，离线打包）', [
     ['render3d', '页面使用 3D 渲染（关闭则为 2D 精灵绘制）', 'bool', true],
@@ -92,6 +95,7 @@ export const GROUPS = [
     ['cup3dHeight', '3D 杯子高度(×杯口直径，参考≈1.7)', 'range', 1.7, 0.6, 2.5, 0.01],
     ['cup3dBottom', '3D 杯底半径(×杯口直径)', 'range', 0.33, 0.15, 0.5, 0.01],
     ['mat3dBoxColor', '材质：纸箱颜色', 'color', '#d9a466'],
+    ['mat3dBoxGlow', '材质：纸箱自发光(参考纸箱各面都很亮)', 'range', 0.45, 0, 1, 0.01],
     ['mat3dBoxRough', '材质：纸箱粗糙度', 'range', 0.9, 0, 1, 0.01],
     ['mat3dBeltRough', '材质：传送带粗糙度', 'range', 0.6, 0, 1, 0.01],
     ['belt3dHeight', '传送带高度(px)', 'range', 30, 0, 40, 0.5],
@@ -102,11 +106,12 @@ export const GROUPS = [
     ['slideSpeed', '托盘滑动速度(格/秒，参考≈6)', 'range', 6, 1, 30, 0.5],
     ['cupInterval', '落杯间隔(ms，参考≈200)', 'range', 200, 30, 800, 10],
     ['cupFly', '落杯时长(ms，参考≈150)', 'range', 150, 30, 800, 10],
-    ['boxGrow', '纸箱出现(ms)', 'range', 300, 50, 1500, 10],
-    ['boxClose', '纸箱合盖(ms，参考≈400)', 'range', 400, 50, 1500, 10],
-    ['boxFlyDur', '纸箱飞走(ms，参考≈400)', 'range', 400, 100, 2000, 10],
+    ['boxGrow', '托盘升起 + 纸箱长出并摊开翻盖(ms，参考≈600)', 'range', 600, 50, 2000, 10],
+    ['boxClose', '纸箱合盖(ms，参考≈340：前后盖先合、左右盖后合)', 'range', 340, 50, 1500, 10],
+    ['boxFlyDur', '纸箱飞走(ms，参考≈380)', 'range', 380, 100, 2000, 10],
+    ['boxFlyTo', '纸箱飞向', 'select', 'right', [['right', '向右飞出画面（经计数器后方，参考）'], ['counter', '飞到计数器并缩小消失（v1.1）']]],
     ['boxScale', '纸箱大小(×托盘，参考≈1.6)', 'range', 1.6, 0.8, 2.5, 0.01],
-    ['boxLift', '纸箱升起高度(px，参考≈110)', 'range', 110, 0, 300, 1],
+    ['boxLift', '托盘/纸箱升起高度(px，参考≈150)', 'range', 150, 0, 300, 1],
     ['niceAt', '“Nice”出现时机', 'select', 'fly', [['fly', '纸箱合好开始飞走时（参考）'], ['done', '纸箱飞到计数器后']]],
     ['sparkCount', 'Nice 闪光星星数量', 'range', 10, 0, 40, 1],
     ['sparkSize', 'Nice 闪光星星大小', 'range', 1, 0.2, 3, 0.05],
@@ -205,7 +210,7 @@ export function migrate(obj) {
     mv('handImg', 'handImage'); mv('sfxVol', 'sfxVolume'); mv('sfx', 'sfxMute', x => !x); mv('recTail', 'tailSec', x => Math.round(x / 100) / 10); mv('endText', 'endTitle');
     v = 1;
   }
-  const OLD = { 6: { cam3dPitch: 41, belt3dHeight: 10, light3dElev: 55, shadow3dOpacity: 0.28, mat3dTileClearcoat: 0.35, floorColor: '#aec6e9', frameColor: '#4a6aa8', colBrown: '#7e533b', colCream: '#f7e9b3', colGreen: '#c1f113', bgColor: '#e1c590', beltRail: '#9fb8e8', beltTop: '#93a9d6', beltSide: '#34497e', cupBrown: '#453027', cupCream: '#f1e3b4', cupGreen: '#8cc400' }, 5: { handSize: 0.34, handAnchorX: 0.05, handAnchorY: 0.05, handImage: '' }, 4: { handSize: 0.42 }, 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
+  const OLD = { 6: { boxLift: 110, boxGrow: 300, boxClose: 400, boxFlyDur: 400, cam3dPitch: 41, belt3dHeight: 10, light3dElev: 55, shadow3dOpacity: 0.28, mat3dTileClearcoat: 0.35, floorColor: '#aec6e9', frameColor: '#4a6aa8', colBrown: '#7e533b', colCream: '#f7e9b3', colGreen: '#c1f113', bgColor: '#e1c590', beltRail: '#9fb8e8', beltTop: '#93a9d6', beltSide: '#34497e', cupBrown: '#453027', cupCream: '#f1e3b4', cupGreen: '#8cc400' }, 5: { handSize: 0.34, handAnchorX: 0.05, handAnchorY: 0.05, handImage: '' }, 4: { handSize: 0.42 }, 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
   for (const nv of Object.keys(OLD).map(Number).sort()) if (v < nv) { for (const k in OLD[nv]) if (s[k] === OLD[nv][k]) delete s[k]; v = nv; }
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];

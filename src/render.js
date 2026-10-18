@@ -212,6 +212,13 @@ export function boxBodySprite(S, w, k) {
   g.strokeStyle = 'rgba(120,70,30,0.35)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, W - 1, D + H - 1);
   return { c, w: W + pad * 2, h: D + H + pad * 2, ax: W / 2 + pad, ay: D / 2 + pad };
 }
+// 箱体正面（v1.2：纸箱从出口长出，正面纵向拉伸到出口）；锚点 = 上边中点
+export function boxFrontSprite(S, w, k) {
+  const { W, H } = boxDims(S, w), pad = 2, c = mk((W + pad * 2) * k, (H + pad * 2) * k), g = c.getContext('2d'); g.setTransform(k, 0, 0, k, pad * k, pad * k);
+  const gf = g.createLinearGradient(0, 0, 0, H); gf.addColorStop(0, shade(KR.face, 0.1)); gf.addColorStop(1, shade(KR.face, -0.1)); g.fillStyle = gf; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, 0, W, 1.5); g.strokeStyle = 'rgba(120,70,30,0.35)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, W - 1, H - 1);
+  return { c, w: W + pad * 2, h: H + pad * 2, ax: W / 2 + pad, ay: pad };
+}
 // 翻盖：kind 'side'（宽 W/2，高 D，锚点=左边折线中点，向右合上）/ 'fb'（宽 W，高 D/2，锚点=上边折线中点，向下合上）；face 'out' 外侧亮 / 'in' 内侧暗
 export function boxFlapSprite(S, w, k, kind, face) {
   const { W, D } = boxDims(S, w), fw = kind === 'side' ? W / 2 : W, fh = kind === 'side' ? D : D / 2, pad = 2;

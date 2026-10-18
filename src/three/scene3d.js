@@ -23,6 +23,14 @@ export function create3D() {
   const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), v3 = new THREE.Vector3();
   // 设计坐标 (x,y) → 地面世界坐标
   R.unproj = (x, y, h = 0) => { plane.constant = -h; ray.setFromCamera({ x: x / (DW / 2) - 1, y: 1 - y / (DH / 2) }, camera); const p = new THREE.Vector3(); return ray.ray.intersectPlane(plane, p) ? p : new THREE.Vector3(x, h, y); };
+  // 升起的元素（纸箱 / 箱内托盘与杯子）：先在未升起的屏幕位置 (x, y+lift) 反投影到地面，再求真实高度 h 使其投影回到屏幕 (x, y)
+  const prj = new THREE.Vector3(), sy = P => (1 - prj.copy(P).project(camera).y) * DH / 2;
+  R.place = (it, hBase = 0) => {
+    const L = it.lift || 0, wp = R.wpp(it.x, it.y + L), G = R.unproj(it.x, it.y + L, hBase); if (!L) return { p: G.setY(0), h: 0, wp };
+    const s0 = sy(G), H1 = L * wp * 1.5, s1 = sy(G.clone().setY(hBase + H1)); let h = H1 * (s0 - it.y) / Math.max(1e-6, s0 - s1);
+    const s2 = sy(G.clone().setY(hBase + h)), d = (s0 - s2) / Math.max(1e-6, h); if (d > 0) h += (s2 - it.y) / d;
+    return { p: G.setY(0), h, wp };
+  };
   R.wpp = (x, y) => R.unproj(x - 0.5, y).distanceTo(R.unproj(x + 0.5, y)); // 世界单位 / 像素
   R.setup = (S, L, G, belt) => setup(R, S, L, G, belt);
   R.render = (items, S, w, h) => render(R, items, S, w, h);
@@ -133,7 +141,7 @@ function makeCup(R, S, color) {
   body.castShadow = true; grp.add(body, rim, liq); return grp;
 }
 function makeBox(R, S) {
-  const m = mat(R, 'kraft', () => new THREE.MeshStandardMaterial({ color: S.mat3dBoxColor, roughness: S.mat3dBoxRough, side: THREE.DoubleSide }));
+  const m = mat(R, 'kraft', () => new THREE.MeshStandardMaterial({ color: S.mat3dBoxColor, emissive: new THREE.Color(S.mat3dBoxColor).multiplyScalar(S.mat3dBoxGlow ?? 0.45), roughness: S.mat3dBoxRough, side: THREE.DoubleSide }));
   const mi = mat(R, 'kraftIn', () => new THREE.MeshStandardMaterial({ color: new THREE.Color(S.mat3dBoxColor).multiplyScalar(0.62), roughness: 0.95, side: THREE.DoubleSide }));
   const grp = new THREE.Group(), u = new THREE.PlaneGeometry(1, 1), parts = {};
   const wall = (name, mm) => { const me = new THREE.Mesh(u, mm); me.castShadow = true; me.receiveShadow = true; grp.add(me); parts[name] = me; return me; };
@@ -162,7 +170,8 @@ function updateCups(R, S, by) {
     R.cupInst[color] = [mk2(g.body, new THREE.MeshStandardMaterial({ color: bc, roughness: S.mat3dCupRough, side: THREE.DoubleSide })), mk2(g.rim, new THREE.MeshStandardMaterial({ color: 0xfbfbf5, roughness: 0.5 })), mk2(g.liq, new THREE.MeshStandardMaterial({ color: lc, roughness: 0.35 }))]; R.cupInst[color][2].castShadow = false; } }
   for (const color in R.cupInst) { const list = by[color] || []; for (const im of R.cupInst[color]) { const n = Math.min(N, list.length); for (let i = 0; i < n; i++) im.setMatrixAt(i, list[i]); im.count = n; im.instanceMatrix.needsUpdate = true; } }
 }
-export const IS3D = a => a === 'belt' || a === 'board' || /^(tile_|cup_|boxbody_|boxflap_)/.test(a);
+const boxW = (S, w) => w * S.cellW * 0.98;
+export const IS3D = a => a === 'belt' || a === 'board' || /^(tile_|cup_|boxbody_|boxflap_|boxfront_)/.test(a);
 function render(R, items, S, w, h) {
   if (R.renderer.domElement.width !== w || R.renderer.domElement.height !== h) R.renderer.setSize(w, h, false);
   R.renderer.shadowMap.enabled = !!S.shadow3d; R.hemi.intensity = S.light3dAmbient; R.sun.intensity = S.light3dSun; R.ground.material.opacity = S.shadow3dOpacity;
@@ -171,16 +180,16 @@ function render(R, items, S, w, h) {
     const a = it.asset; if (!IS3D(a) || a === 'belt' || a === 'board' || it.op <= 0.01) continue;
     if (a.startsWith('tile_')) {
       const [, color, w2, fl] = a.split('_'); if (fl) { const o = R.pool.get(it.id.replace(/_flash$/, '')); if (o) o.flash = it.op; continue; }
-      const obj = getObj(R, it.id, () => makeTile(R, S, color, +w2)), sc = R.wpp(it.x, it.y) * S.cellW;
-      const k2 = sc * it.sx, p = R.unproj(it.x, it.y, tileGeo(R, S, +w2).th * k2); obj.position.set(p.x, 0, p.z); /* 顶面中心 = 2D 锚点 */ obj.scale.set(k2, k2, k2 * (it.sy / it.sx) / (R.G.sy(0) / R.G.sx(0)) * 0 + k2);
+      const obj = getObj(R, it.id, () => makeTile(R, S, color, +w2)), sc = R.wpp(it.x, it.y + (it.lift || 0)) * S.cellW;
+      const k2 = sc * it.sx, { p, h } = R.place(it, tileGeo(R, S, +w2).th * k2); obj.position.set(p.x, h, p.z); /* 顶面中心 = 2D 锚点 */ obj.scale.set(k2, k2, k2 * (it.sy / it.sx) / (R.G.sy(0) / R.G.sx(0)) * 0 + k2);
       obj.userData.m.emissive.setRGB(0, 0, 0); R.pool.get(it.id).flash = 0;
     } else if (a.startsWith('cup_')) { // 杯子用 InstancedMesh（每色一批），数百个杯子也只有几次绘制调用
-      const color = a.slice(4), wp = R.wpp(it.x, it.y), sc = S.cupSize * wp * it.sx * S.cup3dScale, onBelt = it.z < 3, hb = onBelt ? R.beltTopH * wp : (it.z >= 49 ? S.tile3dThick * S.cellW * wp * 0.6 : 0), p = R.unproj(it.x, it.y, hb);
-      M4.compose(V3.set(p.x, hb, p.z), Q0, SC.set(sc, sc * (it.sy / it.sx), sc));
+      const color = a.slice(4), wp = R.wpp(it.x, it.y + (it.lift || 0)), sc = S.cupSize * wp * it.sx * S.cup3dScale, onBelt = it.z < 3, hb = onBelt ? R.beltTopH * wp : (it.z >= 49 ? S.tile3dThick * S.cellW * wp * 0.6 : 0), { p, h } = R.place(it, hb);
+      M4.compose(V3.set(p.x, hb + h, p.z), Q0, SC.set(sc, sc * (it.sy / it.sx), sc));
       (cupsBy[color] || (cupsBy[color] = [])).push(M4.clone());
     } else if (a.startsWith('boxbody_') && it.meta) {
-      const m = it.meta, obj = getObj(R, it.id, () => makeBox(R, S)), wp = R.wpp(it.x, it.y), p = R.unproj(it.x, it.y);
-      obj.position.set(p.x, m.lift * wp * 0.5, p.z); const W = m.W * wp, D = m.D * wp, H = m.H * wp; layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1);
+      const m = it.meta, obj = getObj(R, it.id, () => makeBox(R, S)), thT = (S.tile3dThick + 0.03) * S.cellW * R.wpp(it.x, it.y + (it.lift || 0)) * (m.W / boxW(S, m.w)), { p, h, wp } = R.place(it, thT);
+      const W = m.W * wp, D = m.D * wp, H = Math.max(1e-4, m.H * wp); obj.position.set(p.x, Math.max(0, h + thT * 0.9 - H), p.z); /* 参考：箱口 ≈ 升起的托盘顶面，箱体在其下方向下长出（悬空） */ layoutBox(obj, W, D, H, m.thS, m.thF); obj.scale.setScalar(1);
       obj.traverse(o => { if (o.material) { o.material.transparent = it.op < 1; o.material.opacity = it.op; } });
     }
   }

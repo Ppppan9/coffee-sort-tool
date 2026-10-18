@@ -1,0 +1,17 @@
+{
+  "name": "coffee-sort-tool",
+  "version": "1.0.0",
+  "description": "咖啡分拣核玩工具（单文件离线版）",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/run-test.mjs",
+    "test:logic": "node test/logic-test.mjs",
+    "test:ae": "node test/ae-export.mjs && node test/ae-mock.mjs /workspace/coffee_ae_sample.zip && node test/ae-composite.mjs",
+    "test:3d": "E3D=1 node test/ae-export.mjs && bash test/export3d-blender.sh",
+    "test:norec": "node test/no-autorec.mjs"
+  },
+  "repository": { "type": "git", "url": "git+https://github.com/Ppppan9/coffee-sort-tool.git" },
+  "license": "ISC",
+  "devDependencies": { "acorn": "^8.19.0", "esbuild": "^0.28.2", "playwright-core": "^1.64.1", "three": "^0.160.0" }
+}

@@ -29,4 +29,8 @@
 - (1) ✅ 6a50ada：相机按参考棋盘格拟合（tools/fit_camera.mjs：FOV 30 / 俯角 51，格子世界尺寸离散度 0.0006）；传送带改为沿路径扫掠截面（外壁+圆角挡边+带面），带面/托盘顶面/外框顶面/杯底都按自身高度反投影到 2D 位置；3D 颜色按分区中位数校准（test/ref-compare.mjs + tools/ref_diff.py → screenshots/ref_vs_tool.jpg、ref_diff_report.json）；设置 v6 migrate
 - (2) ✅ 61a62b7：纸箱逐帧对比（test/box-fold.mjs → screenshots/box_fold_ref_vs_tool.jpg）：托盘+杯子先升起悬空（150px，ease-out），纸箱在其下长出、翻盖摊平+放大，前后盖先合、左右盖后合（中缝竖直），向右飞出（经计数器后方）；Nice 位置/大小/白光按参考；__game.renderAt 虚拟时钟
 - (3) ✅ 3D 导出（export3d/2）复用页面 scene3d 模型（托盘+半球碗、杯子、可翻折纸箱、扫掠传送带+挡边、棋盘），逐帧烘焙每个节点 TRS；透视相机 + 太阳光；2D 叠加层挂相机下。Blender Cycles 对比网页帧 PSNR 22.3–31.4 dB（test:3d PASS）
-- (4) 进行中：AE 3D 外观（src/ae/look3d.js，设置 aeLook auto/3d/2d），新增 test:ae3d
+- (4) ✅ AE 3D 外观（src/ae/look3d.js，设置 aeLook auto/3d/2d；auto = 记录时页面开启 3D 渲染）：同一 three.js 场景离屏渲染——传送带 / 棋盘整帧 3D 图、每块托盘一张 3D 精灵（初始格位置透视）、杯子 每色×4 纵向分带 3D 精灵（跨带自动拆段）、纸箱长出+翻盖逐帧序列 → 预合成「纸箱3D序列_<色>_<宽>_n<帧>」（同色同宽复用）+ 飞走静帧；2D 覆盖层（计数器 / Nice / 星星 / 手指 / 结束页）不变；图层命名沿用规范（托盘_NN / 咖啡杯_N / 纸箱_N 3D序列）。zip ≈ 11 MB（2D ≈ 8 MB）。test:ae3d PASS：jsx 模拟 0 错误，与网页 3D 帧 PSNR 平均 28–29 dB / 最低 19.5–20 dB（screenshots/ae_export_check_3d.jpg）
+- (5) ✅ 全部测试（逐个运行，2026-10-19 00:00–00:12）：test:logic ALL PASS / npm test（67 托盘 280 杯通关 + 录制）/ test:ae（PSNR 平均 36.5，最低 24.7）/ test:ae3d / test:3d BLENDER PASS（PSNR 21.6–31.4）/ test:shape / test:norec PASS / test:drag ALL PASS
+## v1.2 剩余差距
+- AE 3D 外观：托盘 / 杯子移动到别处仍用初始位置 / 分带渲染的精灵（透视角度不随位置变化）；元素间遮挡、投影按图层顺序近似；纸箱序列为逐帧 PNG（非 AE 原生 3D 图层），与网页 3D 帧最低 PSNR≈20 dB（差异主要在杯子 / 托盘边缘亚像素与阴影）
+- 盒子无 GPU（SwiftShader），3D 页面测试帧率低；长流程测试仍以 2D 为主

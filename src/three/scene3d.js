@@ -38,7 +38,7 @@ function roundedRect(w, d, r) { const s = new THREE.Shape(), x = -w / 2, y = -d 
 // 硅胶托盘（单位：1 格 = 1），顶面挖 2w×2 个圆孔 + 半球凹槽
 function tileGeo(R, S, w) {
   const k = `tile_${w}_${S.tileRadius}_${S.bowlSize}_${S.tile3dThick}`; if (R.geos[k]) return R.geos[k];
-  const W = w - 0.06, D = 0.94, r = Math.min(0.3, S.tileRadius / S.cellW), th = S.tile3dThick, br = 0.25 * S.bowlSize;
+  const W = w - 0.035, D = 0.965, r = Math.min(0.3, S.tileRadius / S.cellW), th = S.tile3dThick, br = 0.25 * S.bowlSize;
   const sh = roundedRect(W, D, r), slots = [];
   for (let q = 0; q < 2; q++) for (let p = 0; p < w * 2; p++) { const x = (p + 0.5) * 0.5 - w / 2, y = (q + 0.5) * 0.5 - 0.5; slots.push([x, y]); const h = new THREE.Path(); h.absarc(x, y, br, 0, Math.PI * 2, true); sh.holes.push(h); }
   const body = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 3, curveSegments: 16 }); body.rotateX(-Math.PI / 2);
@@ -70,19 +70,19 @@ function setup(R, S, L, G, belt) {
     const hw = S.beltW / 2 * R.wpp(x, y) * (S.beltW ? 1 : 0), sc = R.wpp(x, y);
     ribbons.top.push([c.clone().addScaledVector(n, -hw), c.clone().addScaledVector(n, hw), sc]);
   }
-  const mkStrip = (rows, colr, yOff, inset, wallH) => {
+  const mkStrip = (rows, colr, yOff, inset, wallH, walls = true) => {
     const pos = [], ind = [];
     rows.forEach(([a, b, sc], i) => {
       const ai = a.clone().lerp(b, inset), bi = b.clone().lerp(a, inset);
       pos.push(ai.x, (yOff + wallH) * sc, ai.z, bi.x, (yOff + wallH) * sc, bi.z, ai.x, 0, ai.z, bi.x, 0, bi.z);
-      if (i) { const o = (i - 1) * 4, p = i * 4; ind.push(o, p, o + 1, o + 1, p, p + 1); ind.push(o + 2, p + 2, o, o, p + 2, p); ind.push(o + 1, p + 1, o + 3, o + 3, p + 1, p + 3); }
+      if (i) { const o = (i - 1) * 4, p = i * 4; ind.push(o, p, o + 1, o + 1, p, p + 1); if (walls) ind.push(o + 2, p + 2, o, o, p + 2, p); ind.push(o + 1, p + 1, o + 3, o + 3, p + 1, p + 3); }
     });
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(ind); g.computeVertexNormals();
     const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: colr, roughness: S.mat3dBeltRough, metalness: 0, side: THREE.DoubleSide })); m.castShadow = true; m.receiveShadow = true; return m;
   };
   R.beltTopH = bh; // 像素单位，杯子底高度 = beltTopH * wpp
   R.statics.add(mkStrip(ribbons.top, S.beltSide, 0, 0, bh));             // 带体（侧面色）
-  R.statics.add(mkStrip(ribbons.top, S.beltTop, 0.6, 0.12, bh));          // 带面（顶面色）
+  R.statics.add(mkStrip(ribbons.top, S.beltTop, 0.6, 0.1, bh, false));          // 带面（顶面色）
   // 两侧挡边
   const railRows = (s0, s1) => ribbons.top.map(([a, b, sc]) => [a.clone().lerp(b, s0), a.clone().lerp(b, s1), sc]);
   R.statics.add(mkStrip(railRows(0, 0.1), S.beltSide, 0, 0, bh + rail)); R.statics.add(mkStrip(railRows(0.9, 1), S.beltSide, 0, 0, bh + rail));

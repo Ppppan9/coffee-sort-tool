@@ -2,10 +2,11 @@ import { levelFromLayout, REF_LAYOUT, generateLevel, initState, canSend, applySe
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID } from './settings.js';
 import { DW, DH, mk, boardGeo, drawBackground, drawBoard, tileSprite, slotPositions, cupSprite, boxSprite, counterSprite, niceSprite, sparkSprite, starSprite, boxBodySprite, boxFlapSprite, boxDims, beltPath, beltScale, drawBelt, defaultHand, tileColor } from './render.js';
 import { Sfx } from './audio.js';
+import { create3D, IS3D } from './three/scene3d.js';
 import { createAERecorder } from './ae/recorder.js';
 import { export3D } from './export3d/export3d.js';
 
-let S = loadSettings();
+let S = loadSettings(); let r3d = null;
 const cv = document.getElementById('stage'); let ctx = cv.getContext('2d');
 const sfx = new Sfx();
 const now = () => performance.now();
@@ -75,6 +76,7 @@ function rebuild() {
   A.counterCache = new Map();
   { const c = mk(DW * k, DH * k); withCtx(c.getContext('2d'), () => { ctx.setTransform(k, 0, 0, k, 0, 0); drawTexts(); }); A.disclaimer = { c, w: DW, h: DH, ax: 0, ay: 0 }; }
   { const c = mk(DW * k, DH * k); withCtx(c.getContext('2d'), () => { ctx.setTransform(k, 0, 0, k, 0, 0); drawEnd(1); }); A.end_card = { c, w: DW, h: DH, ax: 0, ay: 0 }; }
+  if (S.render3d) { try { r3d = r3d || create3D(); r3d.setup(S, L, G, belt); } catch (e) { console.warn('3D 渲染不可用，回退 2D', e); r3d = null; } }
   const hi = hand.img; if (hi) A.hand = { c: hi, w: hi.width, h: hi.height, ax: S.handAnchorX * hi.width, ay: S.handAnchorY * hi.height };
 }
 function counterAsset(n) { const id = 'counter_' + n; if (!A[id]) A[id] = counterSprite(S, n, view().k * 1.25); return id; }
@@ -177,7 +179,7 @@ function scene(t) {
   const boxAt = (j, bw, x, y, s, thSide, thFB, grow, op, z) => {
     const id = 'box_' + j.i, sx = dsx * s * S.boxScale, sy = dsy * s * S.boxScale, add2 = (n, asset, dx, dy, o) => add(id + n, asset, x + dx * sx, y + dy * sy, { z: z + (o.dz || 0), op, sx: sx * (o.sx ?? 1), sy: sy * (o.sy ?? 1) });
     const W = boxDims(S, bw).W, D = BD;
-    add2('_body', `boxbody_${bw}`, 0, (1 - grow) * (BH + D / 2) * 0, { sy: 1, dz: 0 });
+    add2('_body', `boxbody_${bw}`, 0, 0, { sy: 1, dz: 0 }); out[out.length - 1].meta = { w: bw, W: W * sx, D: D * sx, H: BH * sx * grow, thS: thSide, thF: thFB, lift: 0 };
     const fl = (th, kind, n, dx, dy, dir, dz) => { const c = Math.cos(th), f = c >= 0 ? 'out' : 'in', proj = c >= 0 ? c : c * (kind === 'fb' ? 1.7 : 1); add2(n, `boxflap_${kind}_${f}_${bw}`, dx, dy, kind === 'side' ? { sx: proj * dir, dz } : { sy: proj * dir, dz }); };
     // 背盖、左右盖、前盖（合上时前盖最上层）
     fl(thFB, 'fb', '_flapB', 0 - W / 2 * 0, -D / 2, 1, 0.003);
@@ -225,7 +227,12 @@ function drawScene(items, g, k) {
 }
 function draw(t) {
   const v = view(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
-  const items = scene(t); draw.items = items; drawScene(items, ctx, v.k);
+  const items = scene(t); draw.items = items;
+  if (S.render3d && r3d) { // 3D：沙地背景（2D）→ three.js 渲染的棋盘 / 传送带 / 托盘 / 杯子 / 纸箱 → 2D 覆盖层（计数器 / Nice / 星星 / 文字 / 手）
+    drawScene(items.filter(it => it.z < 1), ctx, v.k);
+    const img = r3d.render(items, S, Math.round(DW * v.k), Math.round(DH * v.k)); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(img, 0, v.oy, DW * v.k, DH * v.k);
+    drawScene(items.filter(it => it.z >= 1 && !IS3D(it.asset)), ctx, v.k);
+  } else drawScene(items, ctx, v.k);
   ctx.setTransform(v.k, 0, 0, v.k, 0, v.oy);
   ripples.forEach(r => { const p = (t - r.t0) / 350; if (p > 1) return; ctx.beginPath(); ctx.arc(r.x, r.y, 10 + 30 * p, 0, 7); ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - p)})`; ctx.lineWidth = 3; ctx.stroke(); });
   while (ripples.length && t - ripples[0].t0 > 400) ripples.shift();
@@ -478,6 +485,6 @@ document.getElementById('btnExport').onclick = () => { const a = document.create
 document.getElementById('btnImport').onclick = () => document.getElementById('importFile').click();
 document.getElementById('importFile').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { const j = JSON.parse(t); S = migrate(j); saveSettings(S); buildPanel(); loadHand(); newGame(); toast('已导入设置'); }).catch(() => toast('导入失败')); };
 document.getElementById('btnReset').onclick = () => { if (!confirm('恢复全部默认设置？')) return; S = { ...DEFS }; saveSettings(S); buildPanel(); loadHand(); newGame(); };
-window.__game = { autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), dragBegin, dragMove, dragEnd, get drag() { return drag; }, get hand() { return hand; }, solvePlanNow: () => solvePlan(L, st), screenToBoard: (x, y) => screenToBoard(x, y), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
+window.__game = { autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, get r3d() { return r3d; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), dragBegin, dragMove, dragEnd, get drag() { return drag; }, get hand() { return hand; }, solvePlanNow: () => solvePlan(L, st), screenToBoard: (x, y) => screenToBoard(x, y), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
 buildPanel(); loadHand(); newGame();
 requestAnimationFrame(loop);

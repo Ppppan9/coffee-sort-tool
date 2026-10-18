@@ -76,11 +76,13 @@ export function createAERecorder(api) {
     const keyCount = p => (p && typeof p === 'object' && !Array.isArray(p) && p.t) ? p.t.length : 0;
     // 每个轨道拆成连续出现段
     const segs = [], layers = [], markers = [], comps = [];
-    for (const tr of rec.tracks.values()) {
-      let a = 0; for (let i = 1; i <= tr.s.length; i++) if (i === tr.s.length || tr.s[i][7] !== tr.s[i - 1][7] + 1) { segs.push({ tr, s: tr.s.slice(a, i) }); a = i; }
-    }
     // v1.2：3D 外观（aeLook：auto = 记录时开启 3D 渲染则用 3D；3d；2d = v1.1 的 2D 精灵）
     const look = S.aeLook === '3d' || (S.aeLook !== '2d' && S.render3d && E.G && E.belt), seqComps = []; let segs2 = segs;
+    // v1.2.1：同一元素换了绘制层（杯子从传送带层进入托盘 / 飞行层，纸箱翻盖在杯子上下切换）时也拆段，每段按自己的层级排序
+    for (const tr of rec.tracks.values()) {
+      const zs = !(look && tr.id.startsWith('box')), zOf = e => e[9] ?? tr.z;
+      let a = 0; for (let i = 1; i <= tr.s.length; i++) if (i === tr.s.length || tr.s[i][7] !== tr.s[i - 1][7] + 1 || (zs && Math.abs(zOf(tr.s[i]) - zOf(tr.s[i - 1])) > 0.5)) { const s = tr.s.slice(a, i); segs.push({ tr: zs ? { ...tr, z: zOf(s[0]) } : tr, s }); a = i; }
+    }
     if (look) {
       const [w2] = S.aeSize && S.aeSize !== 'canvas' ? S.aeSize.split('x').map(Number) : [E.canvas.width];
       const Kr = Math.min(2, Math.max(1, Math.round(w2 / CW * 100) / 100));

@@ -111,8 +111,10 @@ export function runMock(dir) {
   const main = byName[TL.comps.find(c => c.id === TL.mainComp).name];
   if (!main._opened) fail('主合成未打开');
   if (TL.meta.saveAep && !log.saved) fail('未保存 .aep');
-  const tiles = log.comps.flatMap(c => c.layerList).filter(l => /^托盘_\d+$/.test(l.name));
-  const ended = tiles.filter(l => l.outPoint < l.comp.duration - 1e-6).length;
+  // v1.2.1：同一托盘换绘制层（拖动 / 升起打包）会拆成「托盘_01 #1/#2…」多段；按托盘汇总，最后一段结束 = 已消除
+  const tl = log.comps.flatMap(c => c.layerList).filter(l => /^托盘_\d+( #\d+)?$/.test(l.name)), byTile = new Map();
+  for (const l of tl) { const k = l.name.split(' ')[0], o = byTile.get(k); if (!o || l.outPoint > o.outPoint) byTile.set(k, l); }
+  const tiles = [...byTile.values()], ended = tiles.filter(l => l.outPoint < l.comp.duration - 1e-6).length;
   return { errs, stats: st, expected: exp, imports: log.imports, folders: log.folders, comps: log.comps.length, saved: log.saved && path.basename(log.saved), tileLayers: tiles.length, tilesEnded: ended, compMarkers: main.markerProperty.keys.length, alert: log.alerts[log.alerts.length - 1] };
 }
 if (process.argv[2]) {

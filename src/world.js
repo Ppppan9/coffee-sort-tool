@@ -19,6 +19,7 @@ export function createWorld(S, L) {
   const proj = (X, Y, Z) => { V.set(X, Y, Z).project(cam); return [(V.x + 1) * DW / 2, (1 - V.y) * DH / 2]; };
   const wpp = (x, y, h = 0) => un(x - 0.5, y, h).distanceTo(un(x + 0.5, y, h));
   const W = { S, L, cam, un, proj, wpp };
+  const V2 = new THREE.Vector3(); W.depth = (X, Y, Z) => -V2.set(X, Y, Z).applyMatrix4(cam.matrixWorldInverse).z; // 相机深度（越小越近）
   // ---- 棋盘：按 2D 射影棋盘四角反投影得到的轴对齐等距网格（相机按棋盘拟合，残差 < 1 世界单位）----
   const a = S.persp, P = (u, v) => [DW / 2 + S.boardOffX + (u - L.cols / 2) * S.cellW / (1 - a * v), S.boardTop + S.cellH * v / (1 - a * v)];
   const O = un(...P(0, 0)), U1 = un(...P(L.cols, 0)), V1 = un(...P(0, L.rows));

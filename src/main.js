@@ -148,6 +148,7 @@ function scene(t) {
   const out = [], add = (id, asset, x, y, o = {}) => { const it = { id, asset, x, y, sx: o.sx ?? 1, sy: o.sy ?? o.sx ?? 1, rot: o.rot || 0, op: o.op ?? 1, z: o.z ?? 0, lift: o.lift || 0 }; if (o.w) { it.w = o.w; it.wk = o.wk ?? 1; } out.push(it); return it; }; // lift：屏幕升起量(px)；w：世界锚点（托盘底面中心 / 杯底中心），3D 直接使用
   // 世界 → 2D 精灵：托盘锚点 = 顶面中心投影，缩放 = 一格在该处的投影宽 / 深；杯子锚点 = 杯底中心投影，缩放 = 杯口直径投影宽
   const tileAt = (X, Y, Z) => { const yt = Y + Wd.tileTh, c = Wd.proj(X, yt, Z), a = Wd.proj(X - Wd.C / 2, yt, Z), b = Wd.proj(X + Wd.C / 2, yt, Z), f = Wd.proj(X, yt, Z - Wd.CZ / 2), n = Wd.proj(X, yt, Z + Wd.CZ / 2); return { x: c[0], y: c[1], sx: (b[0] - a[0]) / S.cellW, sy: (n[1] - f[1]) / S.cellH }; };
+  const cupZ = (X, Y, Z) => 49.001 + Math.max(0, 6000 - Wd.depth(X, Y + Wd.cupH / 2, Z)) / 1e7; // 托盘 / 出口处杯子的 2D 层级 = 杯身中点相机深度（与 3D 遮挡一致）
   const cupAt = (X, Y, Z) => { const c = Wd.proj(X, Y, Z), a = Wd.proj(X - Wd.cupD / 2, Y, Z), b = Wd.proj(X + Wd.cupD / 2, Y, Z); return { x: c[0], y: c[1], s: (b[0] - a[0]) / S.cupSize }; };
   add('background', 'background', 0, 0, { z: 0 }); add('belt', 'belt', 0, 0, { z: 1 });
   // 传送带上的杯子
@@ -176,7 +177,7 @@ function scene(t) {
   const dockXY = tileScreen(L.cols / 2, L.dockRow + 0.5), dsx = G.sx(L.dockRow + 0.5), dsy = G.sy(L.dockRow + 0.5);
   for (const c of vis.cupFly) {
     const p = clamp01((t - c.t0) / S.cupFly), [X, Y, Z] = c.path(p), ca = cupAt(X, Y, Z);
-    add('cup_' + c.q, 'cup_' + L.queue[c.q], ca.x, ca.y, { sx: ca.s, z: 50 + (Z - Wd.dock[1]) / 1e4, w: [X, Y, Z] });
+    add('cup_' + c.q, 'cup_' + L.queue[c.q], ca.x, ca.y, { sx: ca.s, z: cupZ(X, Y, Z), w: [X, Y, Z] });
   }
   // 纸箱：grow = 杯子随托盘升起、箱体从下长出（翻盖竖起张开）；close = 侧盖先合、前后盖后合（连续翻折）；fly = 合好的箱子飞向计数器
   // v1.2.1 纸箱 = 世界里的真实纸箱（3D 同一份尺寸），2D 精灵是它的投影：箱底 = 升起托盘底面下 1 单位，箱壁在托盘 / 杯子外侧，
@@ -216,7 +217,7 @@ function scene(t) {
       const tid = 'tile_' + String(j.i + 1).padStart(2, '0'), ta = tileAt(Wd.dock[0], Wd.FY + hL, Wd.dock[1]);
       add(tid, `tile_${tile.color}_${tile.w}`, ta.x, ta.y, { sx: ta.sx, sy: ta.sy, z: 49.0005, lift, w: [Wd.dock[0], Wd.FY + hL, Wd.dock[1]] });
     }
-    for (const [q, c] of vis.inTile) if (c.job === j) { const X = Wd.dock[0] + c.dx, Y = Wd.FY + hL + Wd.cupRest, Z = Wd.dock[1] + c.dz, ca = cupAt(X, Y, Z); add('cup_' + q, 'cup_' + L.queue[q], ca.x, ca.y, { sx: ca.s, z: 49.001 + (c.dz + 100) / 100000, lift, w: [X, Y, Z] }); }
+    for (const [q, c] of vis.inTile) if (c.job === j) { const X = Wd.dock[0] + c.dx, Y = Wd.FY + hL + Wd.cupRest, Z = Wd.dock[1] + c.dz, ca = cupAt(X, Y, Z); add('cup_' + q, 'cup_' + L.queue[q], ca.x, ca.y, { sx: ca.s, z: cupZ(X, Y, Z), lift, w: [X, Y, Z] }); }
   }
   for (const j of jobs) {
     if (j.ph !== 'fly') continue; const bw = st.tiles[j.i].w;

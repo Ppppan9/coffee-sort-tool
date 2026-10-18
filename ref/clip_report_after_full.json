@@ -1,0 +1,632 @@
+{
+ "html": "index.html",
+ "results": [
+  {
+   "frames": 7256,
+   "finished": true,
+   "rep": {
+    "frames": 7256,
+    "TOL_world": 0.998,
+    "belt": {
+     "frames": 380,
+     "top": 30.79481315612793,
+     "hw": 27.71533203125,
+     "inner": 14.576211929321289,
+     "end": [
+      0,
+      -35.08113479614258
+     ]
+    },
+    "board": {
+     "cells": 72,
+     "cw": 80.71312713623047,
+     "ch": 80.74210198720296,
+     "floorY": 0.5,
+     "frames": 5
+    },
+    "pairs": {
+     "cup-tray": {
+      "maxPen": 0,
+      "violations": 0,
+      "worstAt": {
+       "t": 99033,
+       "kind": "bowl",
+       "c": [
+        -20.2,
+        241.7,
+        45
+       ]
+      }
+     }
+    },
+    "align": {
+     "2D↔3D tray anchor (px)": {
+      "max": 0.607,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 58867,
+       "a": "tile_06"
+      }
+     },
+     "2D↔3D cup anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 57167,
+       "id": "cup_256"
+      }
+     },
+     "2D draw order (cup-cup)": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "tray-cell centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_52"
+      }
+     },
+     "tray-floor height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_01"
+      }
+     },
+     "cup-bowl centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 1500,
+       "tile": "tile_03"
+      }
+     },
+     "cup-bowl height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 1967,
+       "tile": "tile_03"
+      }
+     },
+     "bowl fill order": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "2D↔3D box anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": null
+     },
+     "2D box layering vs cups": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     }
+    },
+    "samples": {}
+   },
+   "name": "reference level (auto drag)",
+   "sec": 140.385
+  },
+  {
+   "frames": 5105,
+   "finished": true,
+   "rep": {
+    "frames": 5105,
+    "TOL_world": 0.998,
+    "belt": {
+     "frames": 380,
+     "top": 30.79481315612793,
+     "hw": 27.71533203125,
+     "inner": 14.576211929321289,
+     "end": [
+      0,
+      -35.08070755004883
+     ]
+    },
+    "board": {
+     "cells": 56,
+     "cw": 80.71312713623047,
+     "ch": 80.75919355664935,
+     "floorY": 0.5,
+     "frames": 5
+    },
+    "pairs": {
+     "cup-tray": {
+      "maxPen": 0,
+      "violations": 0,
+      "worstAt": {
+       "t": 98533,
+       "kind": "bowl",
+       "c": [
+        -20.2,
+        171.3,
+        4.6
+       ]
+      }
+     }
+    },
+    "align": {
+     "2D↔3D tray anchor (px)": {
+      "max": 0.607,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 49633,
+       "a": "tile_01"
+      }
+     },
+     "2D↔3D cup anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 16567,
+       "id": "cup_209"
+      }
+     },
+     "2D draw order (cup-cup)": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "tray-cell centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_35"
+      }
+     },
+     "tray-floor height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_01"
+      }
+     },
+     "cup-bowl centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 1200,
+       "tile": "tile_03"
+      }
+     },
+     "cup-bowl height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 2000,
+       "tile": "tile_03"
+      }
+     },
+     "bowl fill order": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "2D↔3D box anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": null
+     },
+     "2D box layering vs cups": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     }
+    },
+    "samples": {}
+   },
+   "name": "random seed 7 (auto drag)",
+   "sec": 93.887
+  },
+  {
+   "frames": 4601,
+   "finished": true,
+   "rep": {
+    "frames": 4601,
+    "TOL_world": 0.998,
+    "belt": {
+     "frames": 380,
+     "top": 30.79481315612793,
+     "hw": 27.71533203125,
+     "inner": 14.576211929321289,
+     "end": [
+      0,
+      -35.08070755004883
+     ]
+    },
+    "board": {
+     "cells": 56,
+     "cw": 80.71312713623047,
+     "ch": 80.75919355664935,
+     "floorY": 0.5,
+     "frames": 5
+    },
+    "pairs": {
+     "cup-tray": {
+      "maxPen": 0,
+      "violations": 0,
+      "worstAt": {
+       "t": 98067,
+       "kind": "bowl",
+       "c": [
+        -20.2,
+        171.3,
+        4.6
+       ]
+      }
+     }
+    },
+    "align": {
+     "2D↔3D tray anchor (px)": {
+      "max": 0.607,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 49200,
+       "a": "tile_01"
+      }
+     },
+     "2D↔3D cup anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 2733,
+       "id": "cup_189"
+      }
+     },
+     "2D draw order (cup-cup)": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "tray-cell centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_29"
+      }
+     },
+     "tray-floor height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_01"
+      }
+     },
+     "cup-bowl centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 1533,
+       "tile": "tile_04"
+      }
+     },
+     "cup-bowl height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 2933,
+       "tile": "tile_04"
+      }
+     },
+     "bowl fill order": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "2D↔3D box anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": null
+     },
+     "2D box layering vs cups": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     }
+    },
+    "samples": {}
+   },
+   "name": "random seed 42, green 8-cup trays 30% (auto drag)",
+   "sec": 88.244
+  },
+  {
+   "frames": 4149,
+   "finished": true,
+   "rep": {
+    "frames": 4149,
+    "TOL_world": 0.998,
+    "belt": {
+     "frames": 380,
+     "top": 30.79481315612793,
+     "hw": 27.71533203125,
+     "inner": 14.576211929321289,
+     "end": [
+      0,
+      -35.08049392700195
+     ]
+    },
+    "board": {
+     "cells": 48,
+     "cw": 80.71312713623047,
+     "ch": 80.76773977279663,
+     "floorY": 0.5,
+     "frames": 5
+    },
+    "pairs": {
+     "cup-tray": {
+      "maxPen": 0,
+      "violations": 0,
+      "worstAt": {
+       "t": 100200,
+       "kind": "bowl",
+       "c": [
+        -20.2,
+        217.3,
+        45
+       ]
+      }
+     }
+    },
+    "align": {
+     "2D↔3D tray anchor (px)": {
+      "max": 0.607,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 35100,
+       "a": "tile_06"
+      }
+     },
+     "2D↔3D cup anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 1133,
+       "id": "cup_183"
+      }
+     },
+     "2D draw order (cup-cup)": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "tray-cell centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_35"
+      }
+     },
+     "tray-floor height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_01"
+      }
+     },
+     "cup-bowl centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 1467,
+       "tile": "tile_10"
+      }
+     },
+     "cup-bowl height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 100200,
+       "tile": "tile_28"
+      }
+     },
+     "bowl fill order": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "2D↔3D box anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": null
+     },
+     "2D box layering vs cups": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     }
+    },
+    "samples": {}
+   },
+   "name": "random seed 1234 (auto tap/slide)",
+   "sec": 77.831
+  },
+  {
+   "frames": 975,
+   "finished": false,
+   "rep": {
+    "frames": 975,
+    "TOL_world": 0.998,
+    "belt": {
+     "frames": 380,
+     "top": 30.79481315612793,
+     "hw": 27.71533203125,
+     "inner": 14.576211929321289,
+     "end": [
+      0,
+      -35.08113479614258
+     ]
+    },
+    "board": {
+     "cells": 72,
+     "cw": 80.71312713623047,
+     "ch": 80.74210198720296,
+     "floorY": 0.5,
+     "frames": 5
+    },
+    "pairs": {},
+    "align": {
+     "2D↔3D tray anchor (px)": {
+      "max": 0.608,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 100,
+       "a": "tile_01"
+      }
+     },
+     "2D↔3D cup anchor (px)": {
+      "max": 0,
+      "tol": 1,
+      "violations": 0,
+      "worstAt": {
+       "t": 33,
+       "id": "cup_180"
+      }
+     },
+     "2D draw order (cup-cup)": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": null
+     },
+     "tray-cell centre": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_52"
+      }
+     },
+     "tray-floor height": {
+      "max": 0,
+      "tol": 0.5,
+      "violations": 0,
+      "worstAt": {
+       "t": 67,
+       "a": "tile_02"
+      }
+     }
+    },
+    "samples": {}
+   },
+   "name": "shake: tap blocked trays",
+   "sec": 11.357
+  }
+ ],
+ "agg": {
+  "pairs": {
+   "cup-tray": {
+    "maxPen": 0,
+    "violations": 0
+   }
+  },
+  "align": {
+   "2D↔3D tray anchor (px)": {
+    "max": 0.608,
+    "tol": 1,
+    "violations": 0
+   },
+   "2D↔3D cup anchor (px)": {
+    "max": 0,
+    "tol": 1,
+    "violations": 0
+   },
+   "2D draw order (cup-cup)": {
+    "max": 0,
+    "tol": 0.5,
+    "violations": 0
+   },
+   "tray-cell centre": {
+    "max": 0,
+    "tol": 0.5,
+    "violations": 0
+   },
+   "tray-floor height": {
+    "max": 0,
+    "tol": 0.5,
+    "violations": 0
+   },
+   "cup-bowl centre": {
+    "max": 0,
+    "tol": 0.5,
+    "violations": 0
+   },
+   "cup-bowl height": {
+    "max": 0,
+    "tol": 0.5,
+    "violations": 0
+   },
+   "bowl fill order": {
+    "max": 0,
+    "tol": 0.5,
+    "violations": 0
+   },
+   "2D↔3D box anchor (px)": {
+    "max": 0,
+    "tol": 1,
+    "violations": 0
+   },
+   "2D box layering vs cups": {
+    "max": 0,
+    "tol": 0.5,
+    "violations": 0
+   }
+  }
+ },
+ "total": 0,
+ "errs": []
+}

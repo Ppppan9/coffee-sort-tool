@@ -2,7 +2,7 @@
 // 在世界坐标里逐帧检查。只依赖 __game.r3d（页面 3D 渲染器）的 apply()，不需要真正渲染（无 GPU 也快），新旧版本通用。
 window.__clipInit = function () {
   const G = __game, R = G.r3d, S = G.S, THREE_V = (x, y, z) => ({ x, y, z });
-  const st = { frames: 0, pairs: {}, align: {}, viol: {}, samples: {}, prev: new Map() };
+  const st = { frames: 0, cnt: { cupFrames: 0, tileFrames: 0, boxFrames: 0, beltCupFrames: 0 }, pairs: Object.fromEntries(['cup-cup', 'cup-belt', 'cup-tray', 'tray-tray', 'tray-frame', 'tray-floor', 'tray-belt', 'box-cup', 'box-tray', 'box-belt', 'box-box'].map(k => [k, { max: 0, n: 0, at: null }])), align: {}, viol: {}, samples: {}, prev: new Map() };
   const P = (type, pen, info) => { const o = st.pairs[type] || (st.pairs[type] = { max: 0, n: 0, at: null }); if (pen > o.max) { o.max = pen; o.at = info; } if (pen > st.TOL) { o.n++; (st.samples[type] || (st.samples[type] = [])).length < 4 && st.samples[type].push({ pen: +pen.toFixed(2), ...info }); } };
   const A2 = (type, err, tol, info) => { const o = st.align[type] || (st.align[type] = { max: 0, n: 0, tol, at: null }); if (err > o.max) { o.max = err; o.at = info; } if (err > tol) o.n++; };
   // ---- 静态：传送带（从扫掠网格还原每个截面：中心、半宽、挡边内侧、带面高、挡边顶）----
@@ -45,6 +45,7 @@ window.__clipInit = function () {
     // 杯子 ↔ 场景元素（按位置匹配 2D item，用于投影一致性 / 状态）
     const cupItems = items.filter(it => /^cup_\d+$/.test(it.id) && it.op > 0.01);
     for (const c of cups) { c.top = c.y + cH * c.ky; }
+    st.cnt.cupFrames += cups.length; st.cnt.tileFrames += tiles.length;
     // ---- 杯–杯 ----
     const hash = new Map(), HS = 60; cups.forEach((c, i) => { const k = Math.floor(c.x / HS) + ',' + Math.floor(c.z / HS); (hash.get(k) || hash.set(k, []).get(k)).push(i); });
     cups.forEach((a, i) => { const gx = Math.floor(a.x / HS), gz = Math.floor(a.z / HS); for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (const j of hash.get((gx + dx) + ',' + (gz + dz)) || []) { if (j <= i) continue; const b = cups[j], lo = Math.max(a.y, b.y), hi = Math.min(a.top, b.top); if (hi <= lo) continue; const d = Math.hypot(a.x - b.x, a.z - b.z), pen = cupR(a.k, hi - a.y) + cupR(b.k, hi - b.y) - d; if (pen > 0) P('cup-cup', pen, { t: ctx.t, a: [a.x, a.y, a.z].map(v => +v.toFixed(1)), b: [b.x, b.y, b.z].map(v => +v.toFixed(1)) }); } });
@@ -101,7 +102,7 @@ window.__clipInit = function () {
       for (let u = 0; u <= 8; u++) for (let v = 0; v <= 8; v++) { const x = bx + (u / 8 - 0.5) * W, z = bz + (v / 8 - 0.5) * D, q = beltQ(x, z); if (q && q.e <= 0 && q.d < q.f.hw && by < q.f.rail) P('box-belt', q.f.rail - by, { t: ctx.t, part: 'body' }); }
       // 纸箱–纸箱
       const bb = { x0: bx - W / 2, x1: bx + W / 2, z0: bz - D / 2, z1: bz + D / 2, y0: by, y1: by + H }; for (const [, pt] of flapPts) { bb.x0 = Math.min(bb.x0, pt.x); bb.x1 = Math.max(bb.x1, pt.x); bb.z0 = Math.min(bb.z0, pt.z); bb.z1 = Math.max(bb.z1, pt.z); bb.y1 = Math.max(bb.y1, pt.y); }
-      for (const o2 of (st._boxes || [])) { const pen = Math.min(Math.min(bb.x1, o2.x1) - Math.max(bb.x0, o2.x0), Math.min(bb.z1, o2.z1) - Math.max(bb.z0, o2.z0), Math.min(bb.y1, o2.y1) - Math.max(bb.y0, o2.y0)); if (pen > 0) P('box-box', pen, { t: ctx.t }); } (st._boxes || (st._boxes = [])).push(bb);
+      for (const o2 of (st._boxes || [])) { const pen = Math.min(Math.min(bb.x1, o2.x1) - Math.max(bb.x0, o2.x0), Math.min(bb.z1, o2.z1) - Math.max(bb.z0, o2.z0), Math.min(bb.y1, o2.y1) - Math.max(bb.y0, o2.y0)); if (pen > 0) P('box-box', pen, { t: ctx.t }); } st.cnt.boxFrames++; (st._boxes || (st._boxes = [])).push(bb);
       // 2D：纸箱精灵锚点 = 3D 箱口中心投影；2D 层级 = 3D 遮挡（后盖 / 左右盖向外时在杯子后面，正面 / 前盖在杯子前面）
       const bid = id.replace(/_body$/, ''), bi = items.findIndex(it => it.id === id), bit = items[bi];
       if (bit) { const [x, y] = project(bx, by + H, bz); A2('2D↔3D box anchor (px)', Math.hypot(x - bit.x, y - bit.y), 1, { t: ctx.t, id }); const m = bit.meta || {};
@@ -120,6 +121,6 @@ window.__clipInit = function () {
       const hm = 0.5 * cH * S.cupSize, dep = it => it.w ? -(v3.set(it.w[0], it.w[1] + hm, it.w[2]).applyMatrix4(R.camera.matrixWorldInverse).z) : -it.y, da = dep(a), db = dep(b); if (Math.abs(da - db) < 0.5) continue; const nearer = da < db ? ka : kb, farther = da < db ? kb : ka; // 杯身中点的相机深度，越小越近（旧版无世界锚点时用杯底屏幕 y）
       if (nearer < farther) A2('2D draw order (cup-cup)', 1, 0.5, { t: ctx.t, a: a.id, b: b.id }); else A2('2D draw order (cup-cup)', 0, 0.5, {}); }
   };
-  st.report = () => ({ frames: st.frames, TOL_world: +st.TOL.toFixed(3), belt: st.belt, board: st.board, pairs: Object.fromEntries(Object.entries(st.pairs).map(([k, v]) => [k, { maxPen: +v.max.toFixed(2), violations: v.n, worstAt: v.at }])), align: Object.fromEntries(Object.entries(st.align).map(([k, v]) => [k, { max: +v.max.toFixed(3), tol: v.tol, violations: v.n, worstAt: v.at }])), samples: st.samples });
+  st.report = () => ({ frames: st.frames, cnt: st.cnt, TOL_world: +st.TOL.toFixed(3), belt: st.belt, board: st.board, pairs: Object.fromEntries(Object.entries(st.pairs).map(([k, v]) => [k, { maxPen: +v.max.toFixed(2), violations: v.n, worstAt: v.at }])), align: Object.fromEntries(Object.entries(st.align).map(([k, v]) => [k, { max: +v.max.toFixed(3), tol: v.tol, violations: v.n, worstAt: v.at }])), samples: st.samples });
   return st;
 };

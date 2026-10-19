@@ -1,6 +1,6 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
 import { DEFAULT_HAND } from './default_hand.js';
-export const SETTINGS_VERSION = 8;
+export const SETTINGS_VERSION = 9;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -226,6 +226,7 @@ export function migrate(obj) {
   for (const nv of Object.keys(OLD).map(Number).sort()) if (v < nv) { for (const k in OLD[nv]) if (s[k] === OLD[nv][k]) delete s[k]; v = nv; }
   if (v < 7) v = 7; // v7（v1.2.2）：新增 hideCursor（手指出现时隐藏鼠标，默认开）——只补默认
   if (v < 8) v = 8; // v8：导出 H5 试玩广告（新键取 DEFS）
+  if (v < 9) v = 9; // v9：H5 多尺寸自适应（壳层）
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];
   return out;

@@ -522,6 +522,7 @@ document.getElementById('btnReset').onclick = () => { if (!confirm('恢复全部
 const __h5 = applyPlayableMode({
   applySettings: (ps) => { Object.assign(S, ps); saveSettings(S); },
   autoPlay: () => { try { autoSolve(); } catch (e) { } },
+  onResize: () => { /* 2D canvas: CSS contain via __h5FitStage; buffer stays canvasW×canvasH */ },
 });
 if (__h5) { try { const panel = document.getElementById('panel'); if (panel) panel.style.display = 'none'; } catch (e) { } }
 window.__game = { renderAt: t => { window.__vclock = t; step(t); updPress(t); draw(t); }, get items() { return draw.items || []; }, get world() { return Wd; }, get vis() { return vis; }, create3D, autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, doExportH5, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, get r3d() { return r3d; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), dragBegin, dragMove, dragEnd, get drag() { return drag; }, get hand() { return hand; }, solvePlanNow: () => solvePlan(L, st), screenToBoard: (x, y) => screenToBoard(x, y), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };

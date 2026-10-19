@@ -1,6 +1,6 @@
 {
   "name": "coffee-sort-tool",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "咖啡分拣核玩工具（单文件离线版）",
   "type": "module",
   "scripts": {
@@ -17,7 +17,8 @@
     "test:fill": "node test/cup-fill.mjs",
     "test:boxpack": "node test/box-pack.mjs",
     "test:cursor": "node test/cursor-test.mjs",
-    "test:bowls": "node test/bowl-test.mjs"
+    "test:bowls": "node test/bowl-test.mjs",
+    "test:h5": "node test/h5-export.mjs"
   },
   "repository": {
     "type": "git",

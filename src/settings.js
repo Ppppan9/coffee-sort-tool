@@ -1,6 +1,6 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
 import { DEFAULT_HAND } from './default_hand.js';
-export const SETTINGS_VERSION = 7;
+export const SETTINGS_VERSION = 8;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -193,6 +193,17 @@ export const GROUPS = [
     ['export3dFps', '3D 动画帧率', 'select', '30', [['24', '24'], ['25', '25'], ['30', '30'], ['60', '60']]],
     ['export3dHand', '包含手指（贴图平面；结束页是否显示仍按“结束页显示手指”）', 'bool', true],
   ]],
+  ['导出 H5 试玩广告', [
+    ['_exportH5', '导出当前设置为自包含 H5 试玩（无编辑器面板，仅游戏+CTA）', 'button', 'exportH5', '⬇ 导出 H5 试玩 ZIP'],
+    ['h5Format', '渠道格式', 'select', 'tiktok,google,mintegral,generic', [['tiktok,google,mintegral,generic', '全部（TikTok+Google+Mintegral+Generic）'], ['tiktok,generic', 'TikTok + Generic'], ['tiktok', '仅 TikTok/Pangle'], ['google', '仅 Google Ads'], ['mintegral', '仅 Mintegral'], ['generic', '仅 Generic 离线']]],
+    ['h5Orientation', '试玩方向', 'select', '1', [['0', '双端 (0)'], ['1', '竖屏 (1)'], ['2', '横屏 (2)']]],
+    ['h5CtaText', 'CTA 按钮文案', 'text', '立即下载'],
+    ['h5StoreUrl', '应用商店 / 落地页 URL', 'text', 'https://play.google.com/store/apps/details?id=com.example.game'],
+    ['h5GameName', '游戏名（可选）', 'text', '咖啡分拣'],
+    ['h5Icon', '应用图标（可选，透明PNG）', 'file', ''],
+    ['h5MaxMb', '体积告警阈值(MB)', 'range', 5, 1, 20, 0.5],
+    ['h5AutoPlay', '打开试玩后自动通关演示', 'bool', true],
+  ]],
   ['结束页(End Card)', [
     ['endCard', '显示结束页', 'bool', false],
     ['endCardHand', '结束页显示手指（自动通关点按钮）', 'bool', false],
@@ -214,6 +225,7 @@ export function migrate(obj) {
   const OLD = { 6: { boxLift: 110, boxGrow: 300, boxClose: 400, boxFlyDur: 400, cam3dPitch: 41, belt3dHeight: 10, light3dElev: 55, shadow3dOpacity: 0.28, mat3dTileClearcoat: 0.35, floorColor: '#aec6e9', frameColor: '#4a6aa8', colBrown: '#7e533b', colCream: '#f7e9b3', colGreen: '#c1f113', bgColor: '#e1c590', beltRail: '#9fb8e8', beltTop: '#93a9d6', beltSide: '#34497e', cupBrown: '#453027', cupCream: '#f1e3b4', cupGreen: '#8cc400' }, 5: { handSize: 0.34, handAnchorX: 0.05, handAnchorY: 0.05, handImage: '' }, 4: { handSize: 0.42 }, 3: { boxClose: 450, niceDur: 800 }, 2: { cupSize: 39, cupGap: 40, beltW: 46, beltSide: '#4b6aa5', beltTop: '#aac0e7' } }; // 版本 → 旧默认（仍等于旧默认才替换）
   for (const nv of Object.keys(OLD).map(Number).sort()) if (v < nv) { for (const k in OLD[nv]) if (s[k] === OLD[nv][k]) delete s[k]; v = nv; }
   if (v < 7) v = 7; // v7（v1.2.2）：新增 hideCursor（手指出现时隐藏鼠标，默认开）——只补默认
+  if (v < 8) v = 8; // v8：导出 H5 试玩广告（新键取 DEFS）
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];
   return out;

@@ -1,6 +1,6 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
 import { DEFAULT_HAND } from './default_hand.js';
-export const SETTINGS_VERSION = 9;
+export const SETTINGS_VERSION = 10;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -197,6 +197,9 @@ export const GROUPS = [
     ['_exportH5', '导出当前设置为自包含 H5 试玩（无编辑器面板，仅游戏+CTA）', 'button', 'exportH5', '⬇ 导出 H5 试玩 ZIP'],
     ['h5Format', '渠道格式', 'select', 'tiktok,google,mintegral,generic', [['tiktok,google,mintegral,generic', '全部（TikTok+Google+Mintegral+Generic）'], ['tiktok,generic', 'TikTok + Generic'], ['tiktok', '仅 TikTok/Pangle'], ['google', '仅 Google Ads'], ['mintegral', '仅 Mintegral'], ['generic', '仅 Generic 离线']]],
     ['h5Orientation', '试玩方向', 'select', '1', [['0', '双端 (0)'], ['1', '竖屏 (1)'], ['2', '横屏 (2)']]],
+    ['h5Device', '预览机型', 'select', 'adaptive', [['adaptive', '自适应（全机型，导出推荐）'], ['iphone-se', 'iPhone SE · 375×667'], ['iphone-13', 'iPhone 12/13 · 390×844'], ['iphone-14-pro-max', 'iPhone 14 Pro Max · 428×926'], ['pixel-7', 'Pixel 7 · 412×915'], ['galaxy-s20', 'Galaxy S20 Ultra · 412×915'], ['ipad-mini', 'iPad Mini · 768×1024'], ['ipad-air', 'iPad Air · 820×1180'], ['ipad-pro', 'iPad Pro · 1024×1366'], ['fold-cover', 'Galaxy Z Fold 外屏 · 280×653'], ['nest-hub', 'Nest Hub / 横屏平板 · 1024×600'], ['custom', '自定义尺寸']]],
+    ['h5DeviceW', '预览宽度(px)', 'range', 390, 240, 1440, 1],
+    ['h5DeviceH', '预览高度(px)', 'range', 844, 400, 2560, 1],
     ['h5CtaText', 'CTA 按钮文案', 'text', '立即下载'],
     ['h5StoreUrl', '应用商店 / 落地页 URL', 'text', 'https://play.google.com/store/apps/details?id=com.example.game'],
     ['h5GameName', '游戏名（可选）', 'text', '咖啡分拣'],
@@ -227,6 +230,7 @@ export function migrate(obj) {
   if (v < 7) v = 7; // v7（v1.2.2）：新增 hideCursor（手指出现时隐藏鼠标，默认开）——只补默认
   if (v < 8) v = 8; // v8：导出 H5 试玩广告（新键取 DEFS）
   if (v < 9) v = 9; // v9：H5 多尺寸自适应（壳层）
+  if (v < 10) v = 10; // v10：H5 预览机型/尺寸（预览+导出）
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];
   return out;

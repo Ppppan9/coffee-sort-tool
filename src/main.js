@@ -7,7 +7,7 @@ import { create3D, IS3D } from './three/scene3d.js';
 import { createWorld, setBelt, cupPath } from './world.js';
 import { createAERecorder } from './ae/recorder.js';
 import { export3D } from './export3d/export3d.js';
-import { exportH5PlayableFromPage, applyPlayableMode } from './h5/index.js';
+import { exportH5PlayableFromPage, applyPlayableMode, applyH5DevicePresetToSettings, markH5DeviceCustomIfSizeEdited, bindEditorDevicePreview } from './h5/index.js';
 
 let S = loadSettings(); let r3d = null;
 const cv = document.getElementById('stage'); let ctx = cv.getContext('2d');
@@ -471,6 +471,9 @@ function loop(t) {
 // ---------- 设置面板 ----------
 const NEWGAME_KEYS = /^(level|seed|cols|rows|emptyCells|colorCount|checker|wideChance|runBias|shape)/;
 function applyChange(k) {
+  if (k === 'h5DeviceW' || k === 'h5DeviceH') markH5DeviceCustomIfSizeEdited(S);
+  if (k === 'h5Device' || k === 'h5DeviceW' || k === 'h5DeviceH') { try { if (window.__h5EditorDeviceFit) window.__h5EditorDeviceFit(); } catch (e) { } }
+
   if (k === 'shapeImg' && S.shapeImg) S.level = 'image';
   saveSettings(S);
   if (k === 'handImage' || k === 'handAnchorX' || k === 'handAnchorY') loadHand();
@@ -478,9 +481,11 @@ function applyChange(k) {
 }
 function loadHand() { const done2 = im => { hand.img = im; if (L) rebuild(); }; const im = new Image(); im.onload = () => done2(im); im.onerror = () => done2(defaultHand()); /* 默认 = 麻将工具同款手指 PNG */ im.src = S.handImage || DEFAULT_HAND; }
 function buildPanel() {
-  const body = document.getElementById('panelBody'); body.innerHTML = '';
+  const body = document.getElementById('panelBody');
+  const openTitles = new Set([...body.querySelectorAll('details[open] summary')].map(s => s.textContent));
+  body.innerHTML = '';
   GROUPS.forEach(([title, items], gi) => {
-    const det = document.createElement('details'); if (gi < 1) det.open = true; det.innerHTML = `<summary>${title}</summary>`;
+    const det = document.createElement('details'); if (gi < 1 || openTitles.has(title) || title.startsWith('导出 H5')) det.open = true; det.innerHTML = `<summary>${title}</summary>`;
     items.forEach(([k, label, type, def, a, b, step2]) => {
       const row = document.createElement('div'); row.className = 'row'; row.innerHTML = `<label title="${k}">${label}</label>`;
       if (type === 'range') {
@@ -490,7 +495,7 @@ function buildPanel() {
         row.append(r, n);
       } else if (type === 'color') { const c = document.createElement('input'); c.type = 'color'; c.value = S[k]; c.oninput = () => { S[k] = c.value; applyChange(k); }; row.append(c); }
       else if (type === 'bool') { row.classList.add('t-switch'); const l = document.createElement('label'); l.className = 'switch'; l.innerHTML = `<input type="checkbox" class="switch-input" id="chk_${k}" ${S[k] ? 'checked' : ''}><span class="slider"></span>`; l.querySelector('input').onchange = e => { S[k] = e.target.checked; applyChange(k); }; row.append(l); }
-      else if (type === 'select') { const s = document.createElement('select'); a.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; s.append(o); }); s.value = S[k]; s.onchange = () => { S[k] = s.value; applyChange(k); }; row.append(s); }
+      else if (type === 'select') { const s = document.createElement('select'); a.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; s.append(o); }); s.value = S[k]; s.onchange = () => { S[k] = s.value; if (k === 'h5Device') { applyH5DevicePresetToSettings(S); buildPanel(); } applyChange(k); }; row.append(s); }
       else if (type === 'text') { const t = document.createElement('input'); t.type = 'text'; t.value = S[k]; t.oninput = () => { S[k] = t.value; applyChange(k); }; row.append(t); }
       else if (type === 'button') { const bt = document.createElement('button'); bt.id = 'btn' + k; bt.textContent = a; bt.onclick = () => Promise.resolve(PANEL_ACTIONS[def] && PANEL_ACTIONS[def]()).catch(e => { status('导出失败：' + e.message); console.error(e); }); row.append(bt); }
       else if (type === 'file') {
@@ -503,7 +508,7 @@ function buildPanel() {
     });
     if (title.startsWith('手指')) det.insertAdjacentHTML('beforeend', '<div class="tip">默认内置“手 + 白色触控笔”（参考视频风格）。上传透明背景 PNG 可替换，用锚点 X/Y 标定笔尖在图片中的相对位置。</div>');
     if (title.startsWith('导入')) det.insertAdjacentHTML('beforeend', '<div class="tip">任意带透明通道的 PNG/WebP：按“列数×行数”网格量化（格内 alpha&gt;阈值的面积 &gt;50% 记为格子），自动在顶部中央开出口并保证与出口连通，生成器校验关卡可解。</div>');
-    if (title.startsWith('导出 H5')) det.insertAdjacentHTML('beforeend', '<div class="tip">导出 ZIP 含所选渠道子目录（tiktok/google/mintegral/generic）。试玩包无设置面板，仅游戏画面+CTA；体积告警默认 5MB（three.js 工具体积较大时可能超限）。</div>');
+    if (title.startsWith('导出 H5')) det.insertAdjacentHTML('beforeend', '<div class="tip">预览与导出均按所选机型/自定义尺寸；选「自适应」才是全机型 contain/letterbox。指定机型时设计画幅锁定为该分辨率。</div>');
     body.append(det);
   });
 }
@@ -525,6 +530,7 @@ const __h5 = applyPlayableMode({
   onResize: () => { /* 2D canvas: CSS contain via __h5FitStage; buffer stays canvasW×canvasH */ },
 });
 if (__h5) { try { const panel = document.getElementById('panel'); if (panel) panel.style.display = 'none'; } catch (e) { } }
+if (!__h5) bindEditorDevicePreview(() => S);
 window.__game = { renderAt: t => { window.__vclock = t; step(t); updPress(t); draw(t); }, get items() { return draw.items || []; }, get world() { return Wd; }, get vis() { return vis; }, create3D, autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, doExportH5, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, get r3d() { return r3d; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), dragBegin, dragMove, dragEnd, get drag() { return drag; }, get hand() { return hand; }, solvePlanNow: () => solvePlan(L, st), screenToBoard: (x, y) => screenToBoard(x, y), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
 buildPanel(); loadHand(); newGame();
 requestAnimationFrame(loop);

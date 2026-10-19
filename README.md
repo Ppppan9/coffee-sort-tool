@@ -1,5 +1,7 @@
 # ☕ 咖啡分拣核玩工具（coffee-sort-tool）
 
+## v1.2.5：H5 预览机型/尺寸（预览+导出；adaptive=全机型）
+
 单文件离线网页工具（`index.html`，无 CDN），复刻“咖啡杯分拣 / Pop-it 杯托”手游广告玩法，用于录制广告素材、导出 AE 工程与 3D 动画。遵守 `ref/TOOLKIT_STANDARD.md`（与麻将 / 打螺丝工具统一的按钮、设置键名、导出包结构）。
 
 在线：https://ppppan9.github.io/coffee-sort-tool/

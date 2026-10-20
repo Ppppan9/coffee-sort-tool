@@ -7,7 +7,9 @@ import { create3D, IS3D } from './three/scene3d.js';
 import { createWorld, setBelt, cupPath } from './world.js';
 import { createAERecorder } from './ae/recorder.js';
 import { export3D } from './export3d/export3d.js';
-import { exportH5PlayableFromPage, applyPlayableMode, applyH5DevicePresetToSettings, markH5DeviceCustomIfSizeEdited, bindEditorDevicePreview } from './h5/index.js';
+import { exportH5PlayableFromPage, applyPlayableMode, isPlayableNoHand, applyH5DevicePresetToSettings, markH5DeviceCustomIfSizeEdited, bindEditorDevicePreview } from './h5/index.js';
+// H5 试玩由玩家自己玩：导出包内不画手指 / 不隐藏鼠标（编辑器、录制、AE/3D 导出不受影响）
+const H5_NO_HAND = isPlayableNoHand();
 
 let S = loadSettings(); let r3d = null;
 const cv = document.getElementById('stage'); let ctx = cv.getContext('2d');
@@ -275,9 +277,9 @@ function drawEnd(p, noDim) {
 }
 function handScaleOf() { return hand.img ? S.handSize * DW / hand.img.width : 1; }
 const handHiddenByEnd = () => !S.endCardHand && endAlpha(now()) > 0;
-function handState() { if (!S.handShow || !hand.img || !hand.visible || handHiddenByEnd()) return null; return { x: hand.x, y: hand.y, s: handScaleOf() * (1 - S.pressDepth * hand.press) }; }
+function handState() { if (H5_NO_HAND || !S.handShow || !hand.img || !hand.visible || handHiddenByEnd()) return null; return { x: hand.x, y: hand.y, s: handScaleOf() * (1 - S.pressDepth * hand.press) }; }
 // 手指出现在画面上时隐藏系统鼠标（与麻将/打螺丝统一：hideCursor）。手动：手指跟随指针（指尖锚点 = 指针位置）；自动通关：手指可见时
-function handCursorHidden() { return !!(S.hideCursor && S.handShow && hand.img && !handHiddenByEnd() && (!autoRunning || hand.visible)); }
+function handCursorHidden() { return !H5_NO_HAND && !!(S.hideCursor && S.handShow && hand.img && !handHiddenByEnd() && (!autoRunning || hand.visible)); }
 function updateCursor() { const c = handCursorHidden() ? 'none' : 'pointer'; if (cv.style.cursor !== c) cv.style.cursor = c; }
 
 // ---------- 交互 ----------
@@ -442,7 +444,7 @@ function aeStop() { const r = aeRec.rec; recClosed = true; updateAEButtons(); if
 async function aeStopAndExport() { const r = aeStop(); if (!r) { toast('没有记录到内容'); return null; } return doExportAE(true, r); }
 const curRec = () => aeActive() ? aeRec.rec : aeLastRec && aeLastRec.L === L ? aeLastRec : null;
 function updateAEButtons() { const b = document.getElementById('btn_aeToggle'); if (!b) return; b.textContent = aeActive() ? `■ 停止并导出（${((now() - (aeRec.rec.t0 || now())) / 1000).toFixed(1)}s）` : '● 开始记录'; b.classList.toggle('on', aeActive()); }
-async function doExportH5() { try { return await exportH5PlayableFromPage({ toolId: 'coffee-sort-tool', S, status, toast }); } catch (e) { status('H5 导出失败：' + e.message); console.error(e); return null; } }
+async function doExportH5() { try { return await exportH5PlayableFromPage({ toolId: 'coffee-sort-tool', S, stripDataUrls: [DEFAULT_HAND], status, toast }); } catch (e) { status('H5 导出失败：' + e.message); console.error(e); return null; } }
 const PANEL_ACTIONS = { aeToggle: () => aeActive() ? aeStopAndExport() : recStart(), aeExport: () => doExportAE(), export3d: () => doExport3D(), exportH5: () => doExportH5() };
 function recTailDone(t) { return finishedAt && t - finishedAt > (S.endCard ? S.endDelay + 400 : 0) + Math.max(800, S.tailSec * 1000); }
 function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.textContent = `⬇ ${name} (${(blob.size / 1e6).toFixed(1)}MB)`; document.getElementById('recList').prepend(a); a.click(); }
@@ -525,8 +527,10 @@ document.getElementById('btnImport').onclick = () => document.getElementById('im
 document.getElementById('importFile').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { const j = JSON.parse(t); S = migrate(j); saveSettings(S); buildPanel(); loadHand(); newGame(); toast('已导入设置'); }).catch(() => toast('导入失败')); };
 document.getElementById('btnReset').onclick = () => { if (!confirm('恢复全部默认设置？')) return; S = { ...DEFS }; saveSettings(S); buildPanel(); loadHand(); newGame(); };
 const __h5 = applyPlayableMode({
-  applySettings: (ps) => { Object.assign(S, ps); saveSettings(S); },
+  applySettings: (ps) => { Object.assign(S, ps); /* playable: don't persist baked settings to localStorage */ },
   autoPlay: () => { try { autoSolve(); } catch (e) { } },
+  state: () => { try { return JSON.stringify(st); } catch (e) { return ''; } },
+  isEnded: () => { try { return !!(finishedAt || failedAt); } catch (e) { return false; } },
   onResize: () => { /* 2D canvas: CSS contain via __h5FitStage; buffer stays canvasW×canvasH */ },
 });
 if (__h5) { try { const panel = document.getElementById('panel'); if (panel) panel.style.display = 'none'; } catch (e) { } }

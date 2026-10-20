@@ -1,7 +1,7 @@
 // 设置定义：所有可调参数。版本号 + 迁移（与麻将 / 打螺丝工具统一的通用分组、键名、标签见 ref/TOOLKIT_STANDARD.md）
 import { DEFAULT_HAND } from './default_hand.js';
 import { h5DeviceSelectOptions } from './h5/index.js';
-export const SETTINGS_VERSION = 11;
+export const SETTINGS_VERSION = 12;
 export const STORE_KEY = 'coffeeTool.settings';
 export const APP_ID = 'coffee-sort-tool';
 // [key, 标签, 类型, 默认, min, max, step]  类型: range/color/bool/select/text/file/button
@@ -206,7 +206,7 @@ export const GROUPS = [
     ['h5GameName', '游戏名（可选）', 'text', '咖啡分拣'],
     ['h5Icon', '应用图标（可选，透明PNG）', 'file', ''],
     ['h5MaxMb', '体积告警阈值(MB)', 'range', 5, 1, 20, 0.5],
-    ['h5AutoPlay', '打开试玩后自动通关演示', 'bool', true],
+    ['h5AutoPlay', '打开试玩后自动通关演示', 'bool', false],
   ]],
   ['结束页(End Card)', [
     ['endCard', '显示结束页', 'bool', false],
@@ -233,6 +233,7 @@ export function migrate(obj) {
   if (v < 9) v = 9; // v9：H5 多尺寸自适应（壳层）
   if (v < 10) v = 10; // v10：H5 预览机型/尺寸（预览+导出）
   if (v < 11) v = 11; // v11：H5 机型分辨率对齐 Chrome（14 Pro Max 430×932、Fold5 外屏 344×882、iPad Pro 13 1032×1376；新增 14 Plus）
+  if (v < 12) { s.h5AutoPlay = false; if (s.h5Format === 'tiktok,google,mintegral,generic') s.h5Format = 'applovin,facebook,google,mintegral,moloco,tiktok,unity,generic'; v = 12; } // v12：试玩由玩家自己玩 → 自动演示默认关（一次性）；旧「全部」→ 8 渠道
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];
   return out;

@@ -196,7 +196,7 @@ export const GROUPS = [
   ]],
   ['导出 H5 试玩广告', [
     ['_exportH5', '导出当前设置为自包含 H5 试玩（无编辑器面板，仅游戏+CTA）', 'button', 'exportH5', '⬇ 导出 H5 试玩 ZIP'],
-    ['h5Format', '渠道格式', 'select', 'tiktok,google,mintegral,generic', [['tiktok,google,mintegral,generic', '全部（TikTok+Google+Mintegral+Generic）'], ['tiktok,generic', 'TikTok + Generic'], ['tiktok', '仅 TikTok/Pangle'], ['google', '仅 Google Ads'], ['mintegral', '仅 Mintegral'], ['generic', '仅 Generic 离线']]],
+    ['h5Format', '渠道格式', 'select', 'applovin,facebook,google,mintegral,moloco,tiktok,unity,generic', [['applovin,facebook,google,mintegral,moloco,tiktok,unity,generic', '全部（AppLovin+Facebook+Google+Mintegral+Moloco+TikTok+Unity+Generic）'], ['tiktok,generic', 'TikTok + Generic'], ['applovin', '仅 AppLovin（MRAID）'], ['facebook', '仅 Facebook/Meta（≤2MB）'], ['google', '仅 Google Ads'], ['mintegral', '仅 Mintegral'], ['moloco', '仅 Moloco'], ['tiktok', '仅 TikTok/Pangle'], ['unity', '仅 Unity Ads（MRAID）'], ['generic', '仅 Generic 离线']]],
     ['h5Orientation', '试玩方向', 'select', '1', [['0', '双端 (0)'], ['1', '竖屏 (1)'], ['2', '横屏 (2)']]],
     ['h5Device', '预览机型', 'select', 'adaptive', h5DeviceSelectOptions()],
     ['h5DeviceW', '预览宽度(px)', 'range', 390, 240, 1440, 1],

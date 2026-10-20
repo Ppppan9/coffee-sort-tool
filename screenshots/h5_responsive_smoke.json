@@ -46,6 +46,7 @@
         "playableCss": true
       },
       "letterbox": "bottom-or-cta",
+      "nonBlack": 0.9465123446221279,
       "checks": []
     },
     {
@@ -94,6 +95,7 @@
         "playableCss": true
       },
       "letterbox": "bottom-or-cta",
+      "nonBlack": 0.9461538461538461,
       "checks": []
     },
     {
@@ -142,6 +144,7 @@
         "playableCss": true
       },
       "letterbox": "bottom-or-cta",
+      "nonBlack": 0.9466249041165942,
       "checks": []
     },
     {
@@ -189,6 +192,7 @@
         "hasFit": true,
         "playableCss": true
       },
+      "nonBlack": 0.9461233087580004,
       "checks": []
     },
     {
@@ -236,6 +240,7 @@
         "hasFit": true,
         "playableCss": true
       },
+      "nonBlack": 0.9455315452274948,
       "checks": []
     },
     {
@@ -284,6 +289,7 @@
         "playableCss": true
       },
       "letterbox": "bottom-or-cta",
+      "nonBlack": 0.9465481067039664,
       "checks": []
     },
     {
@@ -332,6 +338,7 @@
         "playableCss": true
       },
       "letterbox": "side",
+      "nonBlack": 0.9462860118014579,
       "checks": []
     }
   ],

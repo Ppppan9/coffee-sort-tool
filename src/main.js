@@ -383,6 +383,7 @@ async function autoDrag(stp, tok) {
 async function autoSolve() {
   if (autoRunning) { autoToken++; autoRunning = false; hand.visible = false; hand.follow = null; updAutoBtn(); return; }
   if (finishedAt || failedAt) newGame();
+  if (drag) { const tv = vis.tiles[drag.i]; if (tv) tv.moving = false; drag = null; st.dockBlock = false; hand.follow = null; } // 残留的手动拖动（换局/漏掉松手）会让自动拖动一直拿不到托盘而原地空转
   let plan = solvePlan(L, st); if (!plan) { status('当前局面无解，请重新开始'); return; }
   const tok = ++autoToken; autoRunning = true; updAutoBtn(); sfx.resume();
   hand.x = 820; hand.y = 1450; hand.visible = true;

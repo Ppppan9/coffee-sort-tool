@@ -268,6 +268,15 @@ for name, keys in meta.get("opacity", {}).items():
     v = opacity_node.get(o.active_material.name)
     if not v:
         continue
+    # 精简导出会让相同的材质 / 网格共用：给要做淡入淡出的物体单独复制一份材质，避免别的物体跟着变透明
+    if o.active_material.users > 1 or (o.data is not None and o.data.users > 1):
+        m2 = o.active_material.copy()
+        slot = o.material_slots[o.active_material_index]
+        slot.link = "OBJECT"
+        slot.material = m2
+        v = m2.node_tree.nodes.get("Opacity") if m2.node_tree else None
+        if not v:
+            continue
     for t, a in keys:
         v.outputs[0].default_value = a
         v.outputs[0].keyframe_insert("default_value", frame=OFF + t * fps)
@@ -300,6 +309,29 @@ for name in meta.get("opacity", {}):
                 kp.interpolation = "CONSTANT"
     n_vis += 1
 report["vis_overrides"] = n_vis
+# 精简导出复用的节点（*_p000 等）：一个节点先后代表多个元素，按每段的入点..出点设显示区间
+n_pool = 0
+for name, spans in (meta.get("poolVis") or {}).items():
+    o = bpy.data.objects.get(name)
+    if not o or not o.parent or not spans:
+        continue
+    p = o.parent
+    ad = p.animation_data
+    if ad and ad.action:
+        for fc in [fc for fc in ad.action.fcurves if fc.data_path == "scale"]:
+            ad.action.fcurves.remove(fc)
+    keys = [(OFF, 0.0)]
+    for a, b in sorted(spans):
+        keys += [(OFF + a * fps, 1.0), (OFF + b * fps, 0.0)]
+    for fr, v in keys:
+        p.scale = (v, v, v)
+        p.keyframe_insert("scale", frame=fr)
+    for fc in p.animation_data.action.fcurves:
+        if fc.data_path == "scale":
+            for kp in fc.keyframe_points:
+                kp.interpolation = "CONSTANT"
+    n_pool += 1
+report["pool_vis"] = n_pool
 if RENDER:
     os.makedirs(OUT, exist_ok=True)
     report["renders"] = []

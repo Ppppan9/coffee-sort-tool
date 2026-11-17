@@ -192,6 +192,7 @@ export const GROUPS = [
   ['导出 3D 动画（UE5 / C4D / Blender）', [
     ['_export3d', '用上一次 AE 记录生成 glTF 场景 + Blender 脚本 + 音频', 'button', 'export3d', '导出 3D 动画 (glTF/FBX/Blender)'],
     ['export3dFps', '3D 动画帧率', 'select', '30', [['24', '24'], ['25', '25'], ['30', '30'], ['60', '60']]],
+    ['export3dLite', '引擎精简导出（合并重复模型和材质、复用短暂出现的物体、精简关键帧；导入 3D 引擎更快、不易卡死）', 'bool', true],
     ['export3dHand', '包含手指（贴图平面；结束页是否显示仍按“结束页显示手指”）', 'bool', true],
   ]],
   ['导出 H5 试玩广告', [

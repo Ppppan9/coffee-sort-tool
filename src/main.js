@@ -456,7 +456,7 @@ async function doExportAE(save = true, r0 = curRec()) {
 async function doExport3D(save = true, r0 = curRec()) {
   if (!r0) { toast('请先用“开始记录”记录一段（自动通关或手动游玩）'); return null; }
   status('正在生成 3D 动画…'); const ae = await aeRec.exportZip(r0, { aeFps: String(+S.export3dFps || 30), aeSize: 'canvas', aeSampling: 'bake', aeNames: 'en', aeAudio: 'both', aeLook: '2d' });
-  const r = await export3D({ S: { ...r0.S, export3dFps: S.export3dFps, export3dHand: S.export3dHand, endCardHand: S.endCardHand }, ae, rec: r0, A, G, belt });
+  const r = await export3D({ S: { ...r0.S, export3dFps: S.export3dFps, export3dLite: S.export3dLite, export3dHand: S.export3dHand, endCardHand: S.endCardHand }, ae, rec: r0, A, G, belt });
   window.__e3dLast = r; if (save) download(r.blob, r.name); status(`3D 动画：${r.stats.nodes} 节点，${r.duration.toFixed(2)}s`); return r;
 }
 

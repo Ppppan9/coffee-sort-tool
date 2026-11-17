@@ -4,6 +4,7 @@
 // 2D 叠加层（沙地背景、计数器、Nice、星星、免责声明、手、结束页）= 挂在相机下的贴图平面（HUD），与网页画面同位置同大小。
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { ueOptimizeExport } from './ue-optimize.js';
 import { makeZip } from '../ae/zip.js';
 import { create3D, IS3D } from '../three/scene3d.js';
 import { itemsAt } from '../three/frames.js';
@@ -75,7 +76,9 @@ export async function export3D({ S, ae, rec, A, G, belt }) {
   });
   const scn = new THREE.Scene(); scn.name = 'coffee_scene'; scn.add(root);
   const clip = new THREE.AnimationClip('coffee_game', D, tracks);
-  const glb = await new GLTFExporter().parseAsync(scn, { binary: true, animations: [clip], onlyVisible: false, trs: true });
+  const glb0 = await new GLTFExporter().parseAsync(scn, { binary: true, animations: [clip], onlyVisible: false, trs: true });
+  const UEO = ueOptimizeExport(glb0, S, { fps, opacity: opacity, nodes }); // 引擎精简导出（控制台可关）
+  const glb = UEO.glb;
   const tl = ae.timeline, assetById = new Map(tl.assets.map(a => [a.id, a])), sfxC = tl.comps.find(c => c.id === 'sfx'), mixA = tl.assets.find(a => a.id === 'mix');
   const audio = []; if (sfxC) for (const l of sfxC.layers) { const a = assetById.get(l.src.asset); if (a) audio.push({ file: a.file, t: l.start || 0, name: l.name }); }
   const scene3d = {
@@ -83,7 +86,7 @@ export async function export3D({ S, ae, rec, A, G, belt }) {
     units: { px: PX, note: 'coffee_root 缩放 0.001（页面 3D 场景单位 → 米）；Y 轴向上；相机与页面 3D 渲染一致（透视）' },
     camera: { name: cam.name, type: 'perspective', yfov: cam.fov, aspect: DW / DH, pitch: S.cam3dPitch, distance: S.cam3dDist * PX, near: cam.near, far: cam.far },
     lights: { sun: { name: sun.name, intensity: S.light3dSun, elev: S.light3dElev, azim: S.light3dAzim }, ambient: { intensity: S.light3dAmbient, sky: '#ffffff', ground: '#9a8460' }, shadowOpacity: S.shadow3dOpacity },
-    visibility: '*_vis 节点 scale=1 显示 / 0 隐藏（STEP）', opacity, nodes, audio, mix: mixA ? { file: mixA.file, t: 0 } : null, stats: { ...stats, tracks: tracks.length },
+    visibility: '*_vis 节点 scale=1 显示 / 0 隐藏（STEP）', opacity: UEO.opacity, optimize: UEO.stats, poolVis: UEO.poolVis, nodes, audio, mix: mixA ? { file: mixA.file, t: 0 } : null, stats: { ...stats, tracks: tracks.length },
     board: { cols: rec.L.cols, rows: rec.L.rows },
   };
   const enc = new TextEncoder();

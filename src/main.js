@@ -538,3 +538,6 @@ if (!__h5) bindEditorDevicePreview(() => S);
 window.__game = { renderAt: t => { window.__vclock = t; step(t); updPress(t); draw(t); }, get items() { return draw.items || []; }, get world() { return Wd; }, get vis() { return vis; }, create3D, autoSolve, newGame, tapTile, tapAt, scene: () => scene(now()), doExportAE, doExport3D, doExportH5, aeRec, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), get aeLastRec() { return aeLastRec; }, get mediaRec() { return rec; }, startRec, stopRec, get S() { return S; }, get r3d() { return r3d; }, set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, get st() { return st; }, get L() { return L; }, get jobs() { return jobs; }, tileScreen: i => tileScreen(vis.tiles[i].u, vis.tiles[i].v), dragBegin, dragMove, dragEnd, get drag() { return drag; }, get hand() { return hand; }, solvePlanNow: () => solvePlan(L, st), screenToBoard: (x, y) => screenToBoard(x, y), canSend: i => canSend(L, st, i), solveNow: () => solve(L, st), loadLevel: Lx => { autoToken++; autoRunning = false; startLevel(Lx); }, migrate, APP_ID };
 buildPanel(); loadHand(); newGame();
 requestAnimationFrame(loop);
+
+import { installPanelUI } from './panel-ui.js';
+installPanelUI({ openKey: 'coffeeTool.panelOpen.v1' });
